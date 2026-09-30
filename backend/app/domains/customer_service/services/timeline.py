@@ -485,6 +485,7 @@ class ConversationTimelineService:
                         "subscription_name": execution.get("subscription_name"),
                         "workflow_version": execution.get("workflow_version"),
                         "handed_over": execution.get("handed_over"),
+                        "waiting_approval": execution.get("waiting_approval"),
                         "trigger_event_type": execution.get("trigger_event_type"),
                         "ticket_id": execution.get("ticket_id"),
                         "customer_id": execution.get("customer_id"),

@@ -57,6 +57,13 @@ def plain_reason(problem: str | None) -> str | None:
     return problem[:160]
 
 
+def _failed_reason(reason: str | None) -> str | None:
+    # A run that failed on every attempt sent nothing, standby reply included.
+    if reason and reason.startswith("The AI provider isn't responding"):
+        return "The AI provider isn't responding, so the customer got no reply."
+    return reason
+
+
 def _outcome(job_status: str, run_status: str | None, problem: str | None) -> str:
     if job_status in {"failed", "dead_letter"} or run_status == "failed":
         return "failed"
@@ -85,9 +92,21 @@ class LiveMonitorService:
                 f"""
                 SELECT j.status AS job_status, j.attempts, j.created_at, j.error_message,
                        j.payload->>'thread_id' AS conversation_id,
-                       j.payload->>'message' AS customer_message,
+                       coalesce(
+                         j.payload->'extras'->>'customer_message',
+                         -- Older refund/cancel review jobs carry an internal line as
+                         -- their message; show what the customer wrote instead.
+                         CASE WHEN j.payload->'extras'->'support_review' IS NOT NULL THEN
+                           (SELECT m.content FROM cs_chat_messages m
+                             WHERE m.session_id::text = j.payload->'extras'->>'session_id'
+                               AND m.role = 'customer' AND m.created_at <= j.created_at
+                             ORDER BY m.created_at DESC LIMIT 1)
+                         END,
+                         j.payload->>'message') AS customer_message,
                        j.payload->'extras'->'subscription'->>'id' AS workflow_id,
                        coalesce(j.payload->'extras'->'subscription'->>'name',
+                                CASE WHEN j.payload->'extras'->'support_review' IS NOT NULL
+                                     THEN 'Order request review' END,
                                 j.payload->'workflow'->>'name') AS workflow_name,
                        j.payload->'extras'->'workflow_version' AS version,
                        r.workflow_run_id, r.status AS run_status,
@@ -126,7 +145,9 @@ class LiveMonitorService:
                     "workflow_name": row.workflow_name,
                     "version": row.version,
                     "outcome": row_outcome,
-                    "reason": plain_reason(problem),
+                    "reason": _failed_reason(plain_reason(problem))
+                    if row_outcome == "failed"
+                    else plain_reason(problem),
                 }
             )
         return rows

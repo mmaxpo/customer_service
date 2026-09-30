@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.session import get_db
+from app.core.session import SessionLocal, get_db
 from app.domains.customer_service.services.customer_feedback import CustomerFeedbackService
 from app.domains.customer_service.integrations.omnichannel.providers import (
     register_default_omnichannel_providers,
@@ -302,11 +304,30 @@ async def create_public_session(
     }
 
 
+async def _analyze_conversation(user_id: UUID, conversation_id: UUID) -> None:
+    """Record the conversation's topic (intent) for the inbox, Live and Desk.
+    Runs after the response so the customer's reply is never delayed."""
+    from app.domains.customer_service.services.conversation_intelligence import (
+        ConversationIntelligenceService,
+    )
+
+    try:
+        async with SessionLocal() as db:
+            await ConversationIntelligenceService(db).analyze(
+                user_id=user_id, conversation_id=conversation_id
+            )
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "Conversation analysis failed for %s", conversation_id
+        )
+
+
 @chat_router.post("/public/{public_key}/sessions/{session_id}/messages")
 async def create_public_message(
     public_key: str,
     session_id: UUID,
     payload: ChatMessageCreateRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     service = build_service(db)
@@ -503,6 +524,11 @@ async def create_public_message(
         )
 
     await service.commit()
+
+    if inbox_message is not None:
+        background_tasks.add_task(
+            _analyze_conversation, settings.user_id, inbox_message.conversation_id
+        )
 
     return {
         **response_payload,

@@ -265,14 +265,15 @@ class CustomerSupportOrchestrationService:
             session=session,
             review_plan_id=review_plan_id,
             review_plan=review_plan,
+            customer_message=message.content,
         )
 
         assistant_message = await self.chat_service.add_ai_message(
             session_id=session.id,
             content=(
-                "I found the order and confirmed your support request. "
-                "It is ready for human review. "
-                "No Shopify action has been performed."
+                f"Thanks. I've passed your request for order {review_plan.order_ref} "
+                "to our team. They'll review it and reply here. "
+                "Nothing on your order has been changed yet."
             ),
         )
 
@@ -360,6 +361,7 @@ class CustomerSupportOrchestrationService:
                 session=session,
                 review_plan_id=review_plan_id,
                 review_plan=review_plan,
+                customer_message=message.content,
             )
 
             continuation_message = self._completed_complex_message(
@@ -576,14 +578,15 @@ class CustomerSupportOrchestrationService:
             session=session,
             review_plan_id=review_plan_id,
             review_plan=review_plan,
+            customer_message=message.content,
         )
 
         assistant_message = await self.chat_service.add_ai_message(
             session_id=session.id,
             content=(
-                "I have confirmed your support request. "
-                "It is ready for human review. "
-                "No Shopify action has been performed."
+                f"Thanks. I've passed your request for order {review_plan.order_ref} "
+                "to our team. They'll review it and reply here. "
+                "Nothing on your order has been changed yet."
             ),
         )
 
@@ -634,8 +637,15 @@ class CustomerSupportOrchestrationService:
         session,
         review_plan_id: str,
         review_plan,
+        customer_message: str,
     ):
         builder = CustomerSupportReviewWorkflowBuilder()
+        # Runs are shown in the Inbox and Live by inbox conversation, which is
+        # not the chat session id.
+        bridge = await self.chat_service.ensure_inbox_bridge_for_session(
+            session=session,
+        )
+        conversation_id = str(bridge.conversation_id)
 
         workflow = builder.build(
             review_plan_id=review_plan_id,
@@ -652,11 +662,12 @@ class CustomerSupportOrchestrationService:
                         "Customer support resolution "
                         f"ready for review: {review_plan_id}"
                     ),
-                    "thread_id": str(session.id),
+                    "thread_id": conversation_id,
                     "extras": {
                         "customer_service": True,
                         "session_id": str(session.id),
-                        "conversation_id": str(session.id),
+                        "conversation_id": conversation_id,
+                        "customer_message": customer_message,
                         "support_review": (
                             builder.support_review_extras(
                                 review_plan_id=review_plan_id,
@@ -669,7 +680,7 @@ class CustomerSupportOrchestrationService:
                             "payload": {
                                 "session_id": str(session.id),
                                 "review_plan_id": review_plan_id,
-                                "conversation_id": str(session.id),
+                                "conversation_id": conversation_id,
                             },
                         },
                     },

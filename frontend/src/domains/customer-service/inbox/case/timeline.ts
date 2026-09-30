@@ -303,9 +303,11 @@ export function buildTimeline(items: AutomationActivityEvent[]): TimelineEntry[]
       if (item.type === "workflow_execution") {
         const version = item.details?.workflow_version;
         run.title = typeof version === "number" ? `${item.title} · v${version}` : item.title;
-        run.status = item.details?.handed_over === true && lower(item.status) === "succeeded"
-          ? { label: "Handed to your team", tone: "attention" }
-          : executionStatus(item.status);
+        run.status = item.details?.waiting_approval === true
+          ? { label: "Waiting for approval", tone: "attention" }
+          : item.details?.handed_over === true && lower(item.status) === "succeeded"
+            ? { label: "Handed to your team", tone: "attention" }
+            : executionStatus(item.status);
       } else {
         // The job is queued just before the message that triggered it is saved;
         // show the run where it actually started.

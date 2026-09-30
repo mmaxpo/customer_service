@@ -225,6 +225,7 @@ export type WorkflowExecution = {
   subscription_name?: string | null;
   workflow_version?: number | null;
   handed_over?: boolean;
+  waiting_approval?: boolean;
   channel?: string | null;
 
   message?: string | null;

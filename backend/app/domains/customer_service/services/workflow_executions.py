@@ -161,9 +161,30 @@ class CustomerServiceWorkflowExecutionService:
         handed_over = await self._handed_over_runs(
             [e["workflow_run_id"] for e in executions if e["workflow_run_id"]]
         )
+        waiting = await self._waiting_approval_runs(
+            [e["workflow_run_id"] for e in executions if e["workflow_run_id"]]
+        )
         for execution in executions:
             execution["handed_over"] = str(execution["workflow_run_id"]) in handed_over
+            execution["waiting_approval"] = str(execution["workflow_run_id"]) in waiting
         return executions
+
+    async def _waiting_approval_runs(self, run_ids: list) -> set[str]:
+        # The job "succeeds" when its run pauses for an approval; the case is
+        # still waiting on the team, not answered.
+        if not run_ids:
+            return set()
+        result = await self.repo.db.execute(
+            text(
+                """
+                SELECT DISTINCT workflow_run_id FROM workflow_waits
+                WHERE workflow_run_id = ANY(:ids)
+                  AND wait_type = 'approval' AND status = 'waiting'
+                """
+            ),
+            {"ids": [str(r) for r in run_ids]},
+        )
+        return set(result.scalars().all())
 
     async def _handed_over_runs(self, run_ids: list) -> set[str]:
         # A run "succeeds" even when a step gave up and asked for a person
@@ -299,8 +320,12 @@ class CustomerServiceWorkflowExecutionService:
             "ticket_id": event_payload.get("ticket_id"),
             "customer_id": event_payload.get("customer_id"),
             "channel": event_payload.get("channel"),
-            "message": payload.get("message"),
-            "workflow_name": workflow.get("name"),
+            "message": extras.get("customer_message") or payload.get("message"),
+            "workflow_name": (
+                "Order request review"
+                if extras.get("support_review")
+                else workflow.get("name")
+            ),
             "attempts": job.attempts,
             "max_attempts": job.max_attempts,
             "error_message": job.error_message,

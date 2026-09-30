@@ -46,6 +46,11 @@ export function handedOverExecution(context: ConversationContext | null, convers
   return latest?.handed_over && lastVisibleSender(conversation) !== "agent" ? latest : null;
 }
 
+export function waitingApprovalExecution(context: ConversationContext | null) {
+  const latest = newestExecution(context?.workflow_executions ?? []);
+  return latest?.waiting_approval ? latest : null;
+}
+
 export function failedExecution(context: ConversationContext | null) {
   const latest = newestExecution(context?.workflow_executions ?? []);
   return latest && FAILED.has(lower(latest.status)) ? latest : null;
@@ -70,6 +75,13 @@ export function deriveCaseState(
       label: "Needs a person",
       tone: "attention",
       description: "The workflow couldn't answer and handed this case to your team.",
+    };
+  }
+  if (waitingApprovalExecution(context)) {
+    return {
+      label: "Waiting for approval",
+      tone: "attention",
+      description: "The workflow is paused until someone approves it in Approvals.",
     };
   }
   const pending = pendingSuggestions(context);
@@ -156,8 +168,8 @@ export function pickNextStep(
   const pending = pendingSuggestions(context);
   if (pending.length > 0) return { kind: "suggestion", action: pending[0], more: pending.length - 1 };
 
-  // A handed-over case needs a teammate's reply, not closing.
-  if (handedOverExecution(context, conversation)) return null;
+  // A handed-over or approval-waiting case needs the team, not closing.
+  if (handedOverExecution(context, conversation) || waitingApprovalExecution(context)) return null;
 
   const sender = lastVisibleSender(conversation);
   if ((sender === "agent" || sender === "ai") && context.ticket) {
