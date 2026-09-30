@@ -1,0 +1,859 @@
+# Stage 40 — Candidate Plan Generation Engine
+
+Version: 1.0
+
+Status: Implementation Specification
+
+---
+
+# Purpose
+
+The Candidate Plan Generation Engine is responsible for exploring multiple possible solutions to a business problem.
+
+The planner should never stop after finding the first valid plan.
+
+Instead, it should search the planning space and generate multiple candidate plans, each representing a different execution strategy.
+
+These plans are later evaluated and ranked.
+
+---
+
+# Philosophy
+
+Planning is search.
+
+Not prediction.
+
+The planner should ask
+
+```
+What is the best solution?
+
+—not—
+
+Can I find one solution?
+```
+
+Good planners compare.
+
+Great planners explore.
+
+---
+
+# Core Principle
+
+The planner should always generate multiple candidate plans whenever possible.
+
+Example
+
+```
+Refund Customer
+
+↓
+
+Plan A
+
+↓
+
+Immediate Refund
+
+----------------
+
+Plan B
+
+↓
+
+Policy Validation
+
+↓
+
+Refund
+
+----------------
+
+Plan C
+
+↓
+
+Store Credit
+
+↓
+
+Customer Confirmation
+
+----------------
+
+Plan D
+
+↓
+
+Human Approval
+
+↓
+
+Refund
+```
+
+Only after comparison should one plan be selected.
+
+---
+
+# Responsibilities
+
+The Candidate Plan Engine owns
+
+✓ Candidate generation
+
+✓ Alternative strategy generation
+
+✓ Capability substitution
+
+✓ Execution strategy exploration
+
+✓ Planning diversification
+
+✓ Candidate normalization
+
+Nothing else.
+
+---
+
+# Pipeline
+
+```
+Capability Graph
+
+↓
+
+Planning Strategies
+
+↓
+
+Candidate Generator
+
+↓
+
+Alternative Exploration
+
+↓
+
+Plan Normalization
+
+↓
+
+Candidate Plans
+
+↓
+
+Plan Evaluation
+```
+
+---
+
+# Input
+
+Consumes
+
+```python
+CapabilityGraph
+
+PlanningContext
+
+Constraints
+
+Policies
+
+LearningInsights
+
+PlanningBudget
+```
+
+---
+
+# Output
+
+Produces
+
+```python
+CandidatePlanCollection
+
+plans
+
+generation_metadata
+
+statistics
+```
+
+---
+
+# Candidate Plan Collection
+
+```python
+CandidatePlanCollection
+
+plans
+
+generation_strategy
+
+generation_duration
+
+search_space
+
+planner_version
+
+metadata
+```
+
+---
+
+# Candidate Plan
+
+```python
+CandidatePlan
+
+id
+
+business_graph
+
+capability_graph
+
+estimated_execution
+
+estimated_verification
+
+estimated_repair
+
+estimated_cost
+
+estimated_latency
+
+estimated_success
+
+confidence
+
+reasoning_summary
+```
+
+Immutable.
+
+---
+
+# Planning Strategies
+
+Planner supports multiple planning strategies.
+
+```
+Deterministic
+
+Template-Based
+
+Capability Alternative
+
+Cost Optimized
+
+Latency Optimized
+
+Reliability Optimized
+
+Learning Guided
+
+LLM Assisted
+```
+
+Several may run simultaneously.
+
+---
+
+# Deterministic Strategy
+
+Always generated first.
+
+Uses
+
+```
+Business Rules
+
+Capability Scores
+
+Constraints
+```
+
+Fast.
+
+Predictable.
+
+---
+
+# Template Strategy
+
+Planner searches
+
+```
+Known Business Patterns
+```
+
+Example
+
+```
+Refund Workflow
+
+↓
+
+Template
+
+↓
+
+Candidate Plan
+```
+
+Reusable.
+
+---
+
+# Capability Alternative Strategy
+
+Planner intentionally swaps capabilities.
+
+Example
+
+```
+Knowledge Search
+
+↓
+
+Hybrid Search
+
+↓
+
+Vector Search
+
+↓
+
+Knowledge Graph
+```
+
+Creates alternatives.
+
+---
+
+# Cost Optimization Strategy
+
+Planner minimizes
+
+```
+LLM Calls
+
+API Calls
+
+Execution Cost
+
+Business Cost
+```
+
+Useful for SMB deployments.
+
+---
+
+# Latency Optimization Strategy
+
+Planner minimizes
+
+```
+Execution Time
+
+Critical Path
+
+Human Waits
+
+External APIs
+```
+
+Useful for customer-facing workflows.
+
+---
+
+# Reliability Strategy
+
+Planner prefers
+
+```
+Verified Capabilities
+
+Low Repair Rate
+
+High Success Rate
+
+Strong Verification
+```
+
+Ideal for financial workflows.
+
+---
+
+# Learning Strategy
+
+Planner asks
+
+```
+What worked before?
+```
+
+Produces plans based on historical success.
+
+---
+
+# LLM-Assisted Strategy
+
+Only when deterministic planning cannot produce sufficient diversity.
+
+LLM suggests
+
+```
+Alternative Goal Ordering
+
+Alternative Capabilities
+
+Alternative Business Logic
+```
+
+Planner validates every suggestion.
+
+LLM never directly creates executable workflows.
+
+---
+
+# Search Space
+
+Planner explores
+
+```
+Capability Variations
+
+Ordering Variations
+
+Verification Variations
+
+Approval Variations
+
+Provider Variations
+
+Repair Variations
+```
+
+Produces many possible plans.
+
+---
+
+# Planning Breadth
+
+Planner limits exploration.
+
+Example
+
+```
+Maximum Candidate Plans
+
+20
+```
+
+Configurable.
+
+---
+
+# Planning Depth
+
+Planner limits recursion.
+
+Example
+
+```
+Maximum Planning Depth
+
+8
+```
+
+Avoids combinatorial explosion.
+
+---
+
+# Candidate Diversity
+
+Generated plans should differ.
+
+Planner avoids
+
+```
+Minor Variations
+
+↓
+
+Duplicate Plans
+```
+
+Search should maximize useful diversity.
+
+---
+
+# Duplicate Detection
+
+Planner compares
+
+```
+Business Graph
+
+Capability Graph
+
+Execution Estimate
+
+Verification Plan
+```
+
+Equivalent plans merged.
+
+---
+
+# Plan Canonicalization
+
+Every candidate normalized.
+
+Example
+
+Different generation paths
+
+↓
+
+Same logical plan
+
+↓
+
+One candidate
+
+Cleaner evaluation.
+
+---
+
+# Strategy Metadata
+
+Each plan stores
+
+```
+Generated By
+
+Generation Time
+
+Search Depth
+
+Alternative Count
+
+Strategy Version
+```
+
+Explainable planning.
+
+---
+
+# Estimated Metrics
+
+Every candidate estimates
+
+```
+Execution Cost
+
+Latency
+
+Verification Cost
+
+Repair Probability
+
+Business Risk
+
+LLM Usage
+
+API Usage
+```
+
+No execution required.
+
+---
+
+# Risk Estimation
+
+Planner predicts
+
+```
+Provider Failure
+
+Approval Delays
+
+External APIs
+
+Missing Data
+
+Policy Risk
+```
+
+Used later during ranking.
+
+---
+
+# Candidate Confidence
+
+Each plan stores
+
+```python
+PlanningConfidence
+
+reasoning
+
+execution
+
+verification
+
+repair
+
+overall
+```
+
+Separate dimensions.
+
+---
+
+# Plan Explanation
+
+Every plan includes
+
+```
+Why this plan exists
+
+Advantages
+
+Disadvantages
+
+Trade-offs
+
+Expected Outcome
+```
+
+Useful for debugging.
+
+---
+
+# Plan Diversity Metrics
+
+Collected
+
+```
+Unique Capabilities
+
+Different Strategies
+
+Different Costs
+
+Different Risks
+
+Different Latencies
+```
+
+Planner avoids tunnel vision.
+
+---
+
+# Candidate Validation
+
+Every plan validated.
+
+Checks
+
+```
+Business Graph Valid
+
+Capabilities Exist
+
+Constraints Satisfied
+
+Dependencies Valid
+
+Verification Possible
+```
+
+Invalid plans discarded.
+
+---
+
+# Generation Budget
+
+Planner obeys
+
+```
+Maximum Time
+
+Maximum Tokens
+
+Maximum Cost
+
+Maximum Plans
+```
+
+Search always terminates.
+
+---
+
+# Events
+
+Engine emits
+
+```
+PlanGenerationStarted
+
+StrategyExecuted
+
+CandidateCreated
+
+CandidateRejected
+
+DuplicateRemoved
+
+GenerationCompleted
+```
+
+Fully observable.
+
+---
+
+# APIs
+
+```python
+generate_candidates()
+
+generate_strategy()
+
+normalize()
+
+validate()
+
+estimate()
+
+remove_duplicates()
+```
+
+Planner calls
+
+```
+build_candidate_plans()
+```
+
+---
+
+# Suggested Backend Structure
+
+```
+app/planner/plan_generation/
+
+    engine.py
+
+    deterministic.py
+
+    templates.py
+
+    alternatives.py
+
+    optimization.py
+
+    diversity.py
+
+    normalization.py
+
+    validation.py
+
+    estimation.py
+
+    events.py
+```
+
+---
+
+# Existing Tajeran Mapping
+
+Already Exists
+
+★★★★★ Workflow Templates
+
+★★★★★ Runtime Graph
+
+★★★★★ Capability Foundation
+
+★★★★☆ Agent Runtime
+
+Needs Implementation
+
+☆☆☆☆☆
+
+Candidate Generator
+
+☆☆☆☆☆
+
+Planning Search
+
+☆☆☆☆☆
+
+Plan Diversity
+
+☆☆☆☆☆
+
+Plan Estimation
+
+☆☆☆☆☆
+
+Plan Normalization
+
+---
+
+# Engineering Principle
+
+The Planner should never commit to the first acceptable plan.
+
+It should search,
+
+compare,
+
+estimate,
+
+and only then decide.
+
+The quality of autonomy depends directly on the quality of explored alternatives.
+
+---
+
+# Long-Term Vision
+
+As Learning grows, the Planner becomes increasingly efficient at exploring the planning space.
+
+Instead of blindly generating alternatives, it learns
+
+- which strategies consistently succeed,
+- which plans minimize repair,
+- which capability combinations produce the best business outcomes.
+
+Planning becomes both faster and smarter over time.
+
+---
+
+# Next Stage
+
+## Stage 41 — Plan Evaluation & Ranking Engine
+
+The Planner now has multiple candidate plans.
+
+The next responsibility is determining which plan should be executed.
+
+The Plan Evaluation Engine will:
+
+- evaluate every candidate,
+- estimate success probability,
+- calculate business value,
+- analyze trade-offs,
+- score competing plans,
+- select the optimal plan,
+- preserve rejected plans for learning.
+
+This engine is the decision-making core of the Planner Runtime.

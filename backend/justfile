@@ -1,0 +1,141 @@
+# justfile
+# Run `just` to list recipes.
+
+set export := true
+
+COMPOSE_DEV := "docker compose -f infra/docker-compose.dev.yml"
+COMPOSE_PROD := "docker compose -f infra/docker-compose.prod.yml"
+
+# ── Help ─────────────────────────────────────────────────────────────────────
+default:
+  @just --list
+
+# ── Development ──────────────────────────────────────────────────────────────
+dev:
+  {{COMPOSE_DEV}} up --detach
+
+dev-down:
+  {{COMPOSE_DEV}} down
+
+dev-logs:
+  {{COMPOSE_DEV}} logs -f
+
+prod-config:
+  {{COMPOSE_PROD}} config
+
+prod-build:
+  docker build -f infra/Dockerfile -t tajeran-backend:release2 .
+
+postgres-ip:
+    docker inspect postgres-dev | jq -r '.[0].NetworkSettings.Networks[]?.IPAddress'
+
+verify:
+    docker ps
+
+clean-db:
+  {{COMPOSE_DEV}} down -v
+
+test:
+    uv run pytest -v
+
+coverage:
+  uv run pytest --cov=app --cov-branch --cov-report=term-missing --cov-report=html -q
+
+coverage-cs:
+  uv run pytest tests/customer_service --cov=app/domains/customer_service --cov-branch --cov-report=term-missing --cov-report=html -q
+
+risk-audit:
+  ./scripts/audit_test_risks.sh
+
+test-audit:
+  uv run pytest --cov=app --cov-branch --cov-report=term-missing -q
+  ./scripts/audit_test_risks.sh
+
+open-report:
+    open htmlcov/index.html
+
+
+
+restart-desctop:
+    open -a Docker
+
+# ── Backend (runs locally) ───────────────────────────────────────────────────
+run:
+  uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# ── Alembic ──────────────────────────────────────────────────────────────────
+# Change models → revision → review → migrate
+revision msg:
+  @echo ">>> Generating new Alembic revision: {{msg}}"
+  uv run alembic revision --autogenerate -m "{{msg}}"
+
+migrate:
+  @echo ">>> Applying Alembic migrations to local DB"
+  uv run alembic upgrade head
+
+current:
+  uv run alembic current
+
+history:
+  uv run alembic history
+
+rollback-db:
+  uv run alembic downgrade -1
+
+# ── Ruff ─────────────────────────────────────────────────────────────────────
+format:
+  uv run ruff format .
+
+fmt-check:
+  uv run ruff format . --check
+
+lint:
+  uv run ruff check .
+
+lint-fix:
+  uv run ruff check . --fix
+
+check:
+  uv run ruff format .
+  uv run ruff check .
+compileall directory:
+    uv run python -m compileall "{{directory}}"
+
+# ── Frontend ───────────────────────────────────────────────────
+frontend:
+	{{COMPOSE_DEV}} up -d frontend
+
+frontend-logs:
+	{{COMPOSE_DEV}} logs -f frontend
+
+frontend-restart:
+	{{COMPOSE_DEV}} restart frontend
+
+rebuild_front:
+  {{COMPOSE_DEV}} build frontend --no-cache
+
+type-check:
+    docker compose -f infra/docker-compose.dev.yml exec frontend sh -lc 'npm run typecheck'
+
+delete-node:
+    rm -rf node_modules package-lock.json .next
+
+
+# ── grep ─────────────────────────────
+
+grep msg:
+    grep -nr "{{msg}}" .
+
+
+
+# ── Job Worker ─────────────────────────────
+
+job:
+    uv run python -m app.platform.jobs
+
+# ── cloudflared ─────────────────────────────
+
+
+tunnel:
+    sh -c 'test -f ~/.cloudflared/cert.pem || cloudflared tunnel login'
+    sh -c 'token="$(cloudflared tunnel token tajeran-frontend-dev)" || exit $?; exec cloudflared tunnel run --protocol http2 --token "$token"'

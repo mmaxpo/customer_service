@@ -1,0 +1,44 @@
+[project]
+name = "mcp-server"
+version = "0.1.0"
+description = "MCP Server"
+requires-python = ">=3.13"
+
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "httpx",
+  "pydantic",
+  "pydantic-settings",
+  "redis",
+  "fastmcp>=2.14.5",
+  "mcp[cli]>=1.26.0",
+]
+
+# Dev dependencies
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+]
+
+# Ruff config
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# Pytest config
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+asyncio_mode = "auto"

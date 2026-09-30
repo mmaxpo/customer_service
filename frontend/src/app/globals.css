@@ -1,0 +1,433 @@
+@import "tailwindcss";
+
+@theme {
+    --color-background: #f5f7fb;
+    --color-foreground: #102033;
+    --color-muted: #eef4fb;
+    --color-muted-foreground: #64748b;
+    --color-border: #d9e4f2;
+    --color-primary: #2446a6;
+    --color-primary-foreground: #ffffff;
+
+    --color-tajeran-50: #f2f6ff;
+    --color-tajeran-100: #e3ecff;
+    --color-tajeran-200: #c8d9ff;
+    --color-tajeran-500: #365fd6;
+    --color-tajeran-700: #2446a6;
+    --color-tajeran-950: #111b3f;
+
+    --color-ai-50: #f6f1ff;
+    --color-ai-100: #ece0ff;
+    --color-ai-700: #6d3cc8;
+    --color-ai-950: #2b174d;
+
+    --color-shopify-50: #ecfdf5;
+    --color-shopify-100: #d1fae5;
+    --color-shopify-700: #047857;
+
+    --color-warn-50: #fffbeb;
+    --color-warn-100: #fef3c7;
+    --color-warn-700: #b45309;
+
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.25rem;
+
+    /* Quiet Commerce Instrument -- Phase 1 semantic tokens.
+       Additive only: existing tajeran, ai, shopify and warn color scales
+       above are still used throughout the app (composer, mission-board,
+       inbox, AppHeader/AppSidebar) and are intentionally left untouched. */
+    --color-surface: #ffffff;
+    --color-surface-elevated: #ffffff;
+    --color-text-secondary: #475569;
+
+    --color-primary-hover: #1b3a8a;
+    --color-focus: var(--color-primary);
+
+    --color-success: var(--color-shopify-700);
+    --color-warning: var(--color-warn-700);
+    --color-danger: #dc2626;
+
+    --color-ai-accent: var(--color-ai-700);
+    --color-commerce-accent: var(--color-shopify-700);
+
+    /* New radius keys, deliberately named outside Tailwind's built-in
+       sm/md/lg/xl/2xl/3xl scale (radius-md would collide with the existing
+       rounded-br-md/rounded-bl-md usage in ChatbotUi.tsx). rounded-lg/xl/2xl
+       above stay exactly as they are. */
+    --radius-control: 0.375rem;
+    --radius-container: 0.5rem;
+
+    /* New shadow key ("shadow-elevated"); does not touch the existing
+       shadow-sm/md/lg/xl/2xl scale used elsewhere in the app. */
+    --shadow-elevated: 0 8px 24px -4px rgba(15, 23, 42, 0.12), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
+
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+}
+.workflow-builder-flow {
+    --bg-color: #0b1020;
+    background:
+            radial-gradient(circle at 20% 10%, rgba(42, 138, 246, 0.18), transparent 30%),
+            radial-gradient(circle at 80% 20%, rgba(233, 42, 103, 0.14), transparent 28%),
+            #0b1020;
+}
+
+.workflow-builder-flow .react-flow__background {
+    opacity: 0.35;
+}
+
+.workflow-builder-flow .react-flow__controls button {
+    background: rgba(15, 23, 42, 0.92);
+    color: white;
+    border-color: rgba(148, 163, 184, 0.25);
+}
+
+.workflow-builder-flow .react-flow__controls button:hover {
+    background: rgba(30, 41, 59, 0.95);
+}
+
+.workflow-builder-flow .react-flow__controls button path {
+    fill: white;
+}
+
+.workflow-builder-flow .tajeran-gradient-edge {
+    stroke: url(#tajeran-edge-gradient);
+    stroke-width: 2.4;
+    stroke-opacity: 0.9;
+    filter: drop-shadow(0 0 6px rgba(42, 138, 246, 0.35));
+}
+
+.workflow-builder-flow .react-flow__edge.animated .tajeran-gradient-edge {
+    stroke-dasharray: 12 8;
+    animation: tajeran-edge-dash 1.6s linear infinite;
+    stroke-linecap: round;
+}
+
+@keyframes tajeran-edge-dash {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: -40;
+    }
+}
+.workflow-builder-flow .react-flow__edge {
+    cursor: pointer;
+}
+
+.workflow-builder-flow .react-flow__edge.selected .tajeran-gradient-edge {
+    stroke-width: 4;
+    filter:
+            drop-shadow(0 0 10px rgba(42, 138, 246, 0.75))
+            drop-shadow(0 0 10px rgba(233, 42, 103, 0.55));
+}
+
+.workflow-builder-flow .react-flow__handle {
+    width: 9px;
+    height: 9px;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    background: #2a8af6;
+}
+
+.workflow-builder-flow {
+    --bg-color: #0b1020;
+    --node-bg: #0f172a;
+    --node-text: #f8fafc;
+    --node-muted: #94a3b8;
+    background:
+            radial-gradient(circle at 20% 10%, rgba(42, 138, 246, 0.18), transparent 30%),
+            radial-gradient(circle at 80% 20%, rgba(233, 42, 103, 0.14), transparent 28%),
+            #0b1020;
+}
+
+.workflow-builder-flow .react-flow__node {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.tajeran-node {
+    position: relative;
+    width: 240px;
+    min-height: 74px;
+    border-radius: 14px;
+    filter:
+            drop-shadow(10px 0 15px rgba(42, 138, 246, 0.18))
+            drop-shadow(-10px 0 15px rgba(233, 42, 103, 0.16));
+}
+
+.tajeran-node-wrapper {
+    position: relative;
+    display: flex;
+    overflow: hidden;
+    padding: 3px;
+    border-radius: 14px;
+}
+
+.tajeran-gradient::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 150%;
+    padding-bottom: 150%;
+    border-radius: 999px;
+    background: conic-gradient(
+            from -160deg at 50% 50%,
+            #e92a67 0deg,
+            #a853ba 120deg,
+            #2a8af6 240deg,
+            #e92a67 360deg
+    );
+    transform: translate(-50%, -50%);
+}
+
+.tajeran-node.selected .tajeran-gradient::before,
+.tajeran-node.running .tajeran-gradient::before {
+    animation: tajeran-spinner 4s linear infinite;
+}
+
+@keyframes tajeran-spinner {
+    100% {
+        transform: translate(-50%, -50%) rotate(-360deg);
+    }
+}
+
+.tajeran-node-inner {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    border-radius: 13px;
+    background: rgba(15, 23, 42, 0.96);
+    color: var(--node-text);
+    padding: 12px;
+}
+
+.tajeran-node-body {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.tajeran-node-icon {
+    display: flex;
+    height: 30px;
+    width: 30px;
+    shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.tajeran-node-input {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--node-text);
+    font-size: 13px;
+    font-weight: 700;
+    outline: none;
+}
+
+.tajeran-node-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--node-text);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.tajeran-node-subtitle {
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--node-muted);
+    font-size: 10px;
+}
+
+.tajeran-node-status {
+    margin-top: 9px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 3px 8px;
+    color: var(--node-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.tajeran-node.done .tajeran-node-status {
+    color: #86efac;
+}
+
+.tajeran-node.failed .tajeran-node-status {
+    color: #fca5a5;
+}
+
+.tajeran-node.paused .tajeran-node-status {
+    color: #fcd34d;
+}
+
+.tajeran-node-badge {
+    position: absolute;
+    right: -11px;
+    top: -11px;
+    z-index: 5;
+    display: flex;
+    height: 30px;
+    width: 30px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background:
+            linear-gradient(#0f172a, #0f172a) padding-box,
+            linear-gradient(135deg, #e92a67, #a853ba, #2a8af6) border-box;
+    border: 2px solid transparent;
+    color: white;
+    box-shadow:
+            6px 0 14px rgba(42, 138, 246, 0.25),
+            -6px 0 14px rgba(233, 42, 103, 0.25);
+}
+
+.tajeran-node-textarea {
+    margin-top: 10px;
+    width: 100%;
+    min-height: 42px;
+    resize: none;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 10px;
+    background: rgba(2, 6, 23, 0.35);
+    color: var(--node-text);
+    padding: 8px;
+    font-size: 11px;
+    outline: none;
+}
+
+
+
+.workflow-builder-flow .react-flow__node:focus {
+    outline: none;
+}
+.workflow-builder-flow .tajeran-handle {
+
+    opacity: 0 !important;
+
+    width: 18px !important;
+
+    height: 18px !important;
+
+    background: transparent !important;
+
+    border: none !important;
+
+    pointer-events: all !important;
+
+}
+
+.workflow-builder-flow .tajeran-node:hover .tajeran-handle,
+.workflow-builder-flow .tajeran-handle.connectingfrom,
+.workflow-builder-flow .tajeran-handle.connectingto,
+.workflow-builder-flow .tajeran-handle.connectionindicator:hover {
+    opacity: 1 !important;
+}
+
+.workflow-builder-flow .tajeran-handle-source {
+
+    right: -12px !important;
+
+}
+
+.workflow-builder-flow .tajeran-handle-target {
+
+    left: -12px !important;
+
+}
+
+.workflow-builder-flow .tajeran-handle:hover {
+    transform: scale(1.35);
+    box-shadow:
+            0 0 18px rgba(42, 138, 246, 0.85),
+            0 0 18px rgba(233, 42, 103, 0.6);
+}
+
+.workflow-builder-flow .react-flow__handle,
+.workflow-builder-flow .react-flow__handle:hover,
+.workflow-builder-flow .react-flow__handle.connectionindicator,
+.workflow-builder-flow .react-flow__handle.connectingfrom,
+.workflow-builder-flow .react-flow__handle.connectingto {
+    opacity: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.workflow-merchant-flow {
+    background:
+        radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.10), transparent 28%),
+        radial-gradient(circle at 80% 30%, rgba(16, 185, 129, 0.10), transparent 28%),
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.workflow-merchant-flow .react-flow__controls {
+    overflow: hidden;
+    border-radius: 16px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+}
+
+.workflow-merchant-flow .react-flow__controls button {
+    border-color: rgba(226, 232, 240, 0.9);
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.workflow-merchant-flow .react-flow__node {
+    transition:
+        transform 180ms ease,
+        filter 180ms ease;
+}
+
+.workflow-merchant-flow .react-flow__node.selected {
+    filter:
+        drop-shadow(0 0 14px rgba(124, 58, 237, 0.32))
+        drop-shadow(0 0 18px rgba(16, 185, 129, 0.18));
+}
+
+.workflow-merchant-flow .react-flow__handle {
+    transition:
+        transform 160ms ease,
+        box-shadow 160ms ease;
+}
+
+.workflow-merchant-flow .react-flow__handle:hover {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.12);
+}
+
+.workflow-merchant-flow .merchant-flow-edge-pulse {
+    animation: merchant-flow-dash 1.2s linear infinite;
+}
+
+.workflow-merchant-flow .merchant-flow-edge-dot {
+    filter:
+        drop-shadow(0 0 6px rgba(124, 58, 237, 0.8))
+        drop-shadow(0 0 10px rgba(16, 185, 129, 0.35));
+}
+
+@keyframes merchant-flow-dash {
+    from {
+        stroke-dashoffset: 24;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}

@@ -1,0 +1,33 @@
+# Shopify app configuration for the Tajeran Support OS backend.
+#
+# Copy this file to shopify.app.toml only when deploying with Shopify CLI.
+# The Dev Dashboard version currently in use is configured separately; do not
+# deploy this file unless you intend to make Shopify CLI the source of truth.
+
+client_id = "cc43dd89a6b060cb663aafebff36f809"
+name = "Tajeran Support OS"
+application_url = "https://dev.tajeran.ai"
+embedded = true
+
+[access_scopes]
+scopes = "read_customers,write_customers,read_orders,write_orders,read_draft_orders,write_draft_orders,read_fulfillments,write_fulfillments,read_products,write_products,read_content,write_content"
+
+[webhooks]
+api_version = "2026-07"
+
+# Shopify's mandatory privacy topics must be declared as compliance_topics.
+# They cannot be registered with the Admin GraphQL enum API.
+[[webhooks.subscriptions]]
+uri = "https://api-dev.tajeran.ai/customer-service/shopify/webhooks"
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+
+[[webhooks.subscriptions]]
+topics = ["orders/create", "orders/updated", "orders/cancelled", "fulfillments/create", "refunds/create"]
+uri = "https://api-dev.tajeran.ai/customer-service/shopify/webhooks"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled", "app_subscriptions/update"]
+uri = "https://api-dev.tajeran.ai/customer-service/shopify/webhooks"
+
+[auth]
+redirect_urls = ["https://api-dev.tajeran.ai/customer-service/shopify/oauth/callback"]

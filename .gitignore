@@ -1,0 +1,38 @@
+# Product services only
+/tajeran-landing/
+/Gorgias Customer Srevice/
+/Gorgias Customer Srevice.zip
+/InterCom Customer Service/
+/Zendesk-customer service/
+/codemind/
+/Feature/
+
+# Secrets and local runtime state
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv/
+**/node_modules/
+**/.pnpm-store/
+**/.next/
+**/out/
+**/build/
+**/.git/
+**/.idea/
+**/.pytest_cache/
+**/.ruff_cache/
+**/__pycache__/
+**/*.py[cod]
+**/.coverage
+**/htmlcov/
+**/*.log
+**/cookies.txt
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/*.pem
+**/*.key
+.DS_Store

@@ -1,0 +1,81 @@
+set dotenv-load := true
+set shell := ["bash", "-cu"]
+
+default:
+    @just --list
+
+# ------------------------
+# Docker
+# ------------------------
+
+build:
+    docker compose build
+
+dev:
+    docker compose up -d
+
+down:
+    docker compose down
+
+logs:
+    docker compose logs -f
+
+restart:
+    just down
+    just up
+
+clean:
+    docker compose down -v --remove-orphans
+
+kill:
+    kill -9 $(lsof -ti :8001)
+
+list-port:
+    lsof -i :8001
+
+# ------------------------
+# UV / Python
+# ------------------------
+
+sync:
+    uv sync --all-extras
+
+install:
+    uv sync --all-extras
+
+shell:
+    uv shell
+
+run:
+    uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8002
+
+# ------------------------
+# Lint
+# ------------------------
+
+lint:
+    uv run ruff check .
+
+lint-fix:
+    uv run ruff check . --fix
+
+format:
+    uv run ruff format .
+
+# ------------------------
+# Tests
+# ------------------------
+
+test:
+    uv run pytest
+
+test-cov:
+    uv run pytest --cov=app --cov-report=term-missing
+
+# ------------------------
+# Quality Gate
+# ------------------------
+
+check:
+    just lint
+    just test

@@ -1,0 +1,13 @@
+CUSTOMER_SERVICE_SCOPE = "customer_service"
+
+CONVERSATION_CREATED = "customer_service.conversation.created"
+MESSAGE_CREATED = "customer_service.message.created"
+AI_REPLY_CREATED = "customer_service.ai_reply.created"
+WORKFLOW_STARTED = "customer_service.workflow.started"
+WORKFLOW_SUCCEEDED = "customer_service.workflow.succeeded"
+WORKFLOW_FAILED = "customer_service.workflow.failed"
+WORKFLOW_PAUSED = "customer_service.workflow.paused"
+APPROVAL_REQUIRED = "customer_service.approval.required"
+SLA_UPDATED = "customer_service.sla.updated"
+SHOPIFY_ACTION_COMPLETED = "customer_service.shopify_action.completed"
+AGENT_PRESENCE_CHANGED = "customer_service.agent.presence.changed"

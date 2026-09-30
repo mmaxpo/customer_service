@@ -1,0 +1,15 @@
+services:
+  mcp:
+    build: .
+    container_name: mcp-server
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    depends_on:
+      - searxng
+
+  searxng:
+    image: searxng/searxng
+    ports:
+      - "8080:8080"

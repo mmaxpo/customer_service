@@ -1,0 +1,24 @@
+use_default_settings: true
+
+server:
+  secret_key: "CHANGE_ME_DEV_ONLY"
+  limiter: true
+  public_instance: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+engines:
+  - name: google
+    disabled: true
+  - name: duckduckgo
+    disabled: false
+  - name: bing
+    disabled: true
+
+outgoing:
+  request_timeout: 3.0

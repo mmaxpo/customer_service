@@ -1,0 +1,59 @@
+name: backend-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test-clean-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: tajeran
+          POSTGRES_PASSWORD: tajeran_test
+          POSTGRES_DB: tajeran_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tajeran -d tajeran_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      APP_ENV: testing
+      DATABASE_URL: postgresql+asyncpg://tajeran:tajeran_test@127.0.0.1:5432/tajeran_test
+      LANGGRAPH_CHECKPOINT_DB_URL: postgresql://tajeran:tajeran_test@127.0.0.1:5432/tajeran_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      SECRET_KEY: ci-secret-key-with-at-least-thirty-two-characters
+      SHOPIFY_TOKEN_ENCRYPTION_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+      TAJERAN_FIELD_ENCRYPTION_KEY: MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --dev
+      - name: Verify a single migration head
+        run: test "$(uv run alembic heads | wc -l | tr -d ' ')" = "1"
+      - name: Migrate an empty database to head
+        run: uv run alembic upgrade head
+      - name: Verify empty upgrade and supported one-step rollback
+        run: uv run python scripts/check_migrations.py
+      - name: Compile and lint runtime failures
+        run: |
+          uv run python -m compileall -q app
+          uv run ruff check app tests --select F821,F822,F823,E9
+      - name: Run complete suite
+        run: uv run pytest -q

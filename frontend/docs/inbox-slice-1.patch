@@ -1,0 +1,260 @@
+diff -ruN frontend4_original/src/app/(app)/app/inbox/page.tsx frontend4/src/app/(app)/app/inbox/page.tsx
+--- frontend4_original/src/app/(app)/app/inbox/page.tsx	2026-06-13 15:00:20.000000000 +0000
++++ frontend4/src/app/(app)/app/inbox/page.tsx	2026-06-29 11:21:11.711510817 +0000
+@@ -32,132 +32,14 @@
+   type WorkflowWait,
+ } from "@/lib/api/customer-service";
+ 
+-function minutesUntil(value?: string | null) {
+-  if (!value) return null;
+-  return Math.round((new Date(value).getTime() - Date.now()) / 60000);
+-}
+-
+-function formatDuration(minutes: number | null) {
+-  if (minutes == null) return "—";
+-  const abs = Math.abs(minutes);
+-  const label = abs < 60 ? `${abs}m` : `${Math.round(abs / 60)}h`;
+-  return minutes < 0 ? `${label} overdue` : `${label} left`;
+-}
+-
+-function formatDate(value?: string | null) {
+-  if (!value) return "—";
+-  return new Intl.DateTimeFormat(undefined, {
+-    month: "short",
+-    day: "numeric",
+-    hour: "2-digit",
+-    minute: "2-digit",
+-  }).format(new Date(value));
+-}
+-
+-function titleFor(item: InboxItem) {
+-  return item.customer_name || item.customer_email || "Unknown customer";
+-}
+-
+-
+-function extractOrderRef(text: string) {
+-  const patterns = [
+-    /#\d{3,}/,
+-    /order\s*#?\s*([a-zA-Z0-9-]{3,})/i,
+-  ];
+-
+-  for (const pattern of patterns) {
+-    const match = text.match(pattern);
+-    if (!match) continue;
+-    return (match[1] ?? match[0]).replace(/^order\s*/i, "").trim();
+-  }
+-
+-  return null;
+-}
+-
+-function readContextValue(context: Record<string, unknown> | null, key: string) {
+-  const value = context?.[key];
+-  if (value === null || value === undefined) return null;
+-  return String(value);
+-}
+-
+-function nestedRecord(value: unknown): Record<string, unknown> | null {
+-  return value && typeof value === "object" && !Array.isArray(value)
+-    ? (value as Record<string, unknown>)
+-    : null;
+-}
+-
+-function workflowExecutionResult(execution: WorkflowExecution) {
+-  const result = nestedRecord(execution.result);
+-  const executionResult = nestedRecord(result?.execution_result);
+-  return executionResult;
+-}
+-
+-function workflowExecutionRealJobId(execution: WorkflowExecution) {
+-  const executionResult = workflowExecutionResult(execution);
+-  return String(executionResult?.job_id || execution.workflow_run_id || execution.job_id || "");
+-}
+-
+-function workflowExecutionRequiresApproval(execution: WorkflowExecution) {
+-  const executionResult = workflowExecutionResult(execution);
+-  return Boolean(executionResult?.requires_human_approval);
+-}
+-
+-function workflowExecutionActionLabel(execution: WorkflowExecution) {
+-  const executionResult = workflowExecutionResult(execution);
+-  return String(
+-    executionResult?.shopify_action ||
+-      executionResult?.type ||
+-      execution.trigger_event_type ||
+-      execution.workflow_name ||
+-      "workflow",
+-  ).replaceAll("_", " ");
+-}
+-
+-
+-
+-function workflowWaitForExecution(
+-
+-  execution: WorkflowExecution,
+-
+-  waits: WorkflowWait[],
+-
+-): WorkflowWait | null {
+-
+-  const runId = execution.workflow_run_id;
+-
+-  if (!runId) {
+-
+-    return null;
+-
+-  }
+-
+-  return (
+-
+-    waits.find(
+-
+-      (wait) =>
+-
+-        wait.status === "waiting" &&
+-
+-        wait.workflow_run_id === String(runId),
+-
+-    ) ?? null
+-
+-  );
+-
+-}
+-
+-function priorityClass(priority?: string | null) {
+-  switch ((priority ?? "").toLowerCase()) {
+-    case "urgent":
+-    case "high":
+-      return "border-red-200 bg-red-50 text-red-700";
+-    case "low":
+-      return "border-slate-200 bg-slate-50 text-slate-600";
+-    default:
+-      return "border-amber-200 bg-amber-50 text-amber-700";
+-  }
+-}
++import { extractOrderRef } from "@/features/customer-service/inbox/utils/orderRef";
++import {
++  readContextValue,
++  workflowExecutionActionLabel,
++  workflowExecutionRealJobId,
++  workflowExecutionRequiresApproval,
++} from "@/features/customer-service/inbox/utils/workflowExecution";
++import { formatDate, formatDuration, minutesUntil, priorityClass, titleFor } from "@/features/customer-service/inbox/utils/formatters";
+ 
+ export default function InboxPage() {
+   const searchParams = useSearchParams();
+diff -ruN frontend4_original/src/features/customer-service/inbox/utils/formatters.ts frontend4/src/features/customer-service/inbox/utils/formatters.ts
+--- frontend4_original/src/features/customer-service/inbox/utils/formatters.ts	1970-01-01 00:00:00.000000000 +0000
++++ frontend4/src/features/customer-service/inbox/utils/formatters.ts	2026-06-29 11:21:11.712242748 +0000
+@@ -0,0 +1,39 @@
++import type { InboxItem } from "@/lib/api/customer-service";
++
++export function minutesUntil(value?: string | null) {
++  if (!value) return null;
++  return Math.round((new Date(value).getTime() - Date.now()) / 60000);
++}
++
++export function formatDuration(minutes: number | null) {
++  if (minutes == null) return "—";
++  const abs = Math.abs(minutes);
++  const label = abs < 60 ? `${abs}m` : `${Math.round(abs / 60)}h`;
++  return minutes < 0 ? `${label} overdue` : `${label} left`;
++}
++
++export function formatDate(value?: string | null) {
++  if (!value) return "—";
++  return new Intl.DateTimeFormat(undefined, {
++    month: "short",
++    day: "numeric",
++    hour: "2-digit",
++    minute: "2-digit",
++  }).format(new Date(value));
++}
++
++export function titleFor(item: InboxItem) {
++  return item.customer_name || item.customer_email || "Unknown customer";
++}
++
++export function priorityClass(priority?: string | null) {
++  switch ((priority ?? "").toLowerCase()) {
++    case "urgent":
++    case "high":
++      return "border-red-200 bg-red-50 text-red-700";
++    case "low":
++      return "border-slate-200 bg-slate-50 text-slate-600";
++    default:
++      return "border-amber-200 bg-amber-50 text-amber-700";
++  }
++}
+diff -ruN frontend4_original/src/features/customer-service/inbox/utils/orderRef.ts frontend4/src/features/customer-service/inbox/utils/orderRef.ts
+--- frontend4_original/src/features/customer-service/inbox/utils/orderRef.ts	1970-01-01 00:00:00.000000000 +0000
++++ frontend4/src/features/customer-service/inbox/utils/orderRef.ts	2026-06-29 11:21:11.711978630 +0000
+@@ -0,0 +1,11 @@
++export function extractOrderRef(text: string) {
++  const patterns = [/#\d{3,}/, /order\s*#?\s*([a-zA-Z0-9-]{3,})/i];
++
++  for (const pattern of patterns) {
++    const match = text.match(pattern);
++    if (!match) continue;
++    return (match[1] ?? match[0]).replace(/^order\s*/i, "").trim();
++  }
++
++  return null;
++}
+diff -ruN frontend4_original/src/features/customer-service/inbox/utils/workflowExecution.ts frontend4/src/features/customer-service/inbox/utils/workflowExecution.ts
+--- frontend4_original/src/features/customer-service/inbox/utils/workflowExecution.ts	1970-01-01 00:00:00.000000000 +0000
++++ frontend4/src/features/customer-service/inbox/utils/workflowExecution.ts	2026-06-29 11:21:11.712083870 +0000
+@@ -0,0 +1,54 @@
++import type { WorkflowExecution, WorkflowWait } from "@/lib/api/customer-service";
++
++export function readContextValue(context: Record<string, unknown> | null, key: string) {
++  const value = context?.[key];
++  if (value === null || value === undefined) return null;
++  return String(value);
++}
++
++function nestedRecord(value: unknown): Record<string, unknown> | null {
++  return value && typeof value === "object" && !Array.isArray(value)
++    ? (value as Record<string, unknown>)
++    : null;
++}
++
++export function workflowExecutionResult(execution: WorkflowExecution) {
++  const result = nestedRecord(execution.result);
++  const executionResult = nestedRecord(result?.execution_result);
++  return executionResult;
++}
++
++export function workflowExecutionRealJobId(execution: WorkflowExecution) {
++  const executionResult = workflowExecutionResult(execution);
++  return String(executionResult?.job_id || execution.workflow_run_id || execution.job_id || "");
++}
++
++export function workflowExecutionRequiresApproval(execution: WorkflowExecution) {
++  const executionResult = workflowExecutionResult(execution);
++  return Boolean(executionResult?.requires_human_approval);
++}
++
++export function workflowExecutionActionLabel(execution: WorkflowExecution) {
++  const executionResult = workflowExecutionResult(execution);
++  return String(
++    executionResult?.shopify_action ||
++      executionResult?.type ||
++      execution.trigger_event_type ||
++      execution.workflow_name ||
++      "workflow",
++  ).replaceAll("_", " ");
++}
++
++export function workflowWaitForExecution(
++  execution: WorkflowExecution,
++  waits: WorkflowWait[],
++): WorkflowWait | null {
++  const runId = execution.workflow_run_id;
++  if (!runId) return null;
++
++  return (
++    waits.find(
++      (wait) => wait.status === "waiting" && wait.workflow_run_id === String(runId),
++    ) ?? null
++  );
++}
