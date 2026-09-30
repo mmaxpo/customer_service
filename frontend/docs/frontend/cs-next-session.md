@@ -49,9 +49,9 @@ Spec: `backend/.claude/features/cs-frontend-spec.md`. Audit: `backend/.claude/fe
 | Ask TCOS briefing: real config keys for every library step; prompts may only use `{{input}}` / `{{vars.key}}`; validation blocks `{{#each}}`-style templates | `automation_studio.py` (`PROPOSAL_SYSTEM`, `_generate`, `_validate`) |
 | Three sample help articles ("Shipping policy (sample)", "Returns and refunds (sample)", "Gift wrapping (sample)") | Created via `POST /api/customer-service/knowledge/sources/inline`. The owner will replace them with real policies. |
 
-Dev workspace workflow state: "Website chat automation" (`15aad0a7-0217-4162-ad96-cce74340aa92`) is **live on v1**. Test versions v8, v10, v12 are in its history (leave them). **v13 is a draft proposal** (`b2fc51a0-0665-4bb8-af3a-13f487ad632e`) that adds a knowledge search before general replies; it passed 5/5 tests with the real AI.
+Dev workspace workflow state: "Website chat automation" (`15aad0a7-0217-4162-ad96-cce74340aa92`) is **live on v1 again**. v13 (knowledge search before general replies) was published on 2026-09-30 and answered correctly from the articles, then was rolled back to v1 because its `kb.search` step (OpenAI embeddings) has no outage fallback: when OpenAI returned 429 "no credits remaining", v13 dead-lettered and the customer got nothing, while v1 sends the standby reply. Re-publish v13 (restore version 13) only after OpenAI has credits again **and** kb.search degrades gracefully (fold into Task 3).
 
-**Nothing is committed to git yet** (~43 changed/new files across `frontend/` and `backend/`, all from this work).
+Work is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
 ---
 
