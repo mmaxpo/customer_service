@@ -77,27 +77,49 @@ export function layoutGraph(graph: Graph) {
   return { position, width, height: dense.length * NODE_H + (dense.length - 1) * GAP_Y, rows: dense };
 }
 
-// Point on an edge's curve inside the gap just below its source node, where
-// the "+" and branch label sit. Long edges would otherwise put them on top of
-// a node in a skipped layer.
-function edgeAnchor(from: { x: number; y: number }, to: { x: number; y: number }) {
+type Point = { x: number; y: number };
+
+// Path for one edge, plus the point in the gap just below its source where
+// the "+" and branch label sit. Edges that skip layers run down a lane beside
+// the steps in between instead of cutting through them.
+function routeEdge(from: Point, to: Point, nodes: Point[]) {
   const x1 = from.x + NODE_W / 2;
   const y1 = from.y + NODE_H;
   const x2 = to.x + NODE_W / 2;
   const y2 = to.y - 2;
-  const mid = (y1 + y2) / 2;
-  const targetY = Math.min(y1 + GAP_Y / 2, (y1 + y2) / 2);
-  let best = { x: (x1 + x2) / 2, y: (y1 + y2) / 2, diff: Infinity };
-  for (let i = 0; i <= 60; i += 1) {
-    const t = i / 60;
-    const u = 1 - t;
-    // Cubic bezier with control points (x1, mid) and (x2, mid).
-    const x = u * u * u * x1 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x2;
-    const y = u * u * u * y1 + 3 * u * u * t * mid + 3 * u * t * t * mid + t * t * t * y2;
-    const diff = Math.abs(y - targetY);
-    if (diff < best.diff) best = { x, y, diff };
+  const between = nodes.filter((p) => p.y > from.y && p.y < to.y);
+
+  if (!between.length) {
+    const mid = (y1 + y2) / 2;
+    const targetY = Math.min(y1 + GAP_Y / 2, mid);
+    let best = { x: (x1 + x2) / 2, y: mid, diff: Infinity };
+    for (let i = 0; i <= 60; i += 1) {
+      const t = i / 60;
+      const u = 1 - t;
+      // Cubic bezier with control points (x1, mid) and (x2, mid).
+      const x = u * u * u * x1 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x2;
+      const y = u * u * u * y1 + 3 * u * u * t * mid + 3 * u * t * t * mid + t * t * t * y2;
+      const diff = Math.abs(y - targetY);
+      if (diff < best.diff) best = { x, y, diff };
+    }
+    return {
+      d: `M${x1},${y1} C${x1},${mid} ${x2},${mid} ${x2},${y2}`,
+      anchor: { x: best.x, y: best.y, leftward: x2 < x1 },
+    };
   }
-  return { x: best.x, y: best.y, leftward: x2 < x1 };
+
+  let lane = x1;
+  for (let i = 0; i < between.length; i += 1) {
+    const hit = between.find((p) => lane > p.x - 12 && lane < p.x + NODE_W + 12);
+    if (!hit) break;
+    lane = hit.x + NODE_W + GAP_X / 2;
+  }
+  const gapTop = y1 + GAP_Y / 2;
+  const gapBottom = to.y - GAP_Y / 2;
+  return {
+    d: `M${x1},${y1} C${x1},${gapTop} ${lane},${gapTop} ${lane},${y1 + GAP_Y} L${lane},${to.y - GAP_Y} C${lane},${gapBottom} ${x2},${gapBottom} ${x2},${y2}`,
+    anchor: { x: (x1 + lane) / 2, y: gapTop, leftward: lane < x1 || (lane === x1 && x2 < x1) },
+  };
 }
 
 export function WorkflowGraph({
@@ -119,6 +141,12 @@ export function WorkflowGraph({
   insertEdge?: number | null;
 }) {
   const { position, width, height } = layoutGraph(graph);
+  const points = [...position.values()];
+  const routes = graph.edges.map((edge) => {
+    const from = position.get(edge.source);
+    const to = position.get(edge.target);
+    return from && to ? routeEdge(from, to, points) : null;
+  });
 
   return (
     <div className="relative mx-auto" style={{ width, height }}>
@@ -129,19 +157,13 @@ export function WorkflowGraph({
           </marker>
         </defs>
         {graph.edges.map((edge, index) => {
-          const from = position.get(edge.source);
-          const to = position.get(edge.target);
-          if (!from || !to) return null;
-          const x1 = from.x + NODE_W / 2;
-          const y1 = from.y + NODE_H;
-          const x2 = to.x + NODE_W / 2;
-          const y2 = to.y;
-          const mid = (y1 + y2) / 2;
+          const route = routes[index];
+          if (!route) return null;
           const strong = highlightEdge?.(edge.source, edge.target) ?? false;
           return (
             <g key={`${edge.source}-${edge.target}-${index}`}>
               <path
-                d={`M${x1},${y1} C${x1},${mid} ${x2},${mid} ${x2},${y2 - 2}`}
+                d={route.d}
                 fill="none"
                 strokeWidth={1.5}
                 strokeDasharray={strong ? "5 4" : undefined}
@@ -149,7 +171,7 @@ export function WorkflowGraph({
                 markerEnd="url(#wf-arrow)"
               />
               {edge.condition ? (() => {
-                const anchor = edgeAnchor(from, to);
+                const { anchor } = route;
                 const offset = onInsert ? 16 : 6;
                 return (
                 <text
@@ -169,9 +191,8 @@ export function WorkflowGraph({
 
       {onInsert
         ? graph.edges.map((edge, index) => {
-            const from = position.get(edge.source);
-            const to = position.get(edge.target);
-            if (!from || !to) return null;
+            const route = routes[index];
+            if (!route) return null;
             const active = insertEdge === index;
             const fromLabel = graph.nodes.find((n) => n.id === edge.source)?.label ?? edge.source;
             const toLabel = graph.nodes.find((n) => n.id === edge.target)?.label ?? edge.target;
@@ -190,7 +211,7 @@ export function WorkflowGraph({
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-surface text-text-secondary hover:border-primary hover:text-primary",
                 )}
-                style={{ left: edgeAnchor(from, to).x, top: edgeAnchor(from, to).y }}
+                style={{ left: route.anchor.x, top: route.anchor.y }}
               >
                 <Plus size={13} aria-hidden />
               </button>

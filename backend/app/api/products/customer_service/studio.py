@@ -1,6 +1,7 @@
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,8 +12,40 @@ from app.domains.customer_service.security.rbac import (
 from app.domains.customer_service.services.automation_studio import (
     AutomationStudioService,
 )
+from app.domains.customer_service.services.desk_insights import DeskInsightsService
+from app.domains.customer_service.services.live_monitor import LiveMonitorService
 
 studio_router = APIRouter(tags=["Customer Service - Automation Studio"])
+
+
+@studio_router.get("/desk/insights")
+async def desk_insights(
+    days: int = Query(default=7, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await DeskInsightsService(db).insights(workspace_id=current_user.id, days=days)
+
+
+@studio_router.get("/live/now")
+async def live_now(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await LiveMonitorService(db).now(workspace_id=current_user.id)
+
+
+@studio_router.get("/live/activity")
+async def live_activity(
+    days: int = Query(default=7, ge=1, le=90),
+    outcome: Literal["answered", "handed_over", "failed", "running", "waiting_approval"] | None = None,
+    workflow_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await LiveMonitorService(db).activity(
+        workspace_id=current_user.id, days=days, outcome=outcome, workflow_id=workflow_id
+    )
 
 
 class ProposalCreate(BaseModel):
@@ -103,6 +136,17 @@ async def refine_proposal(
     )
 
 
+@studio_router.post("/proposals/{proposal_id}/test")
+async def test_proposal(
+    proposal_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).test_proposal(
+        workspace_id=current_user.id, proposal_id=proposal_id
+    )
+
+
 @studio_router.post("/proposals/{proposal_id}/publish")
 async def publish_proposal(
     proposal_id: UUID,
@@ -171,4 +215,27 @@ async def dismiss_run(
         workspace_id=current_user.id,
         reviewer_id=current_user.actor_user_id,
         run_id=run_id,
+    )
+
+
+@studio_router.get("/workflows/{workflow_id}/versions")
+async def version_history(
+    workflow_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await AutomationStudioService(db).version_history(
+        workspace_id=current_user.id, subscription_id=workflow_id
+    )
+
+
+@studio_router.post("/workflows/{workflow_id}/versions/{version}/restore")
+async def restore_version(
+    workflow_id: UUID,
+    version: int,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).restore_version(
+        workspace_id=current_user.id, subscription_id=workflow_id, version=version
     )

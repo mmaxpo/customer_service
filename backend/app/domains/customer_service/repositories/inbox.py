@@ -8,6 +8,7 @@ from app.domains.customer_service.models import (
     Conversation,
     ConversationMessage,
     ConversationTag,
+    CustomerServiceConversationInsight,
     Ticket,
 )
 
@@ -55,6 +56,7 @@ class InboxRepository:
         tickets_by_conversation_id = {}
         latest_message_by_conversation_id = {}
         tags_by_conversation_id = {}
+        topic_by_conversation_id = {}
 
         if conversation_ids:
             ticket_result = await self.db.execute(
@@ -76,6 +78,24 @@ class InboxRepository:
             )
             for conversation_id, tag_name in tag_result.all():
                 tags_by_conversation_id.setdefault(conversation_id, []).append(tag_name)
+
+            # Topic = intent of the latest automatic insight for the conversation.
+            insight_result = await self.db.execute(
+                select(
+                    CustomerServiceConversationInsight.conversation_id,
+                    CustomerServiceConversationInsight.intent,
+                )
+                .where(
+                    CustomerServiceConversationInsight.user_id == user_id,
+                    CustomerServiceConversationInsight.conversation_id.in_(conversation_ids),
+                )
+                .distinct(CustomerServiceConversationInsight.conversation_id)
+                .order_by(
+                    CustomerServiceConversationInsight.conversation_id,
+                    CustomerServiceConversationInsight.created_at.desc(),
+                )
+            )
+            topic_by_conversation_id = dict(insight_result.all())
 
             visible_sender_types = ("customer", "agent", "ai")
 
@@ -140,6 +160,7 @@ class InboxRepository:
                     "moderation_status": conversation.moderation_status,
                     "moderation_reason": conversation.moderation_reason,
                     "tags": tags_by_conversation_id.get(conversation.id, []),
+                    "topic": topic_by_conversation_id.get(conversation.id),
                     "ticket": (
                         {
                             "id": ticket.id,

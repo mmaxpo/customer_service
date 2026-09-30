@@ -37,6 +37,8 @@
     null;
 
 
+  const ratedKey = `${storagePrefix}_rated_session`;
+
   const state = {
     settings: null,
     visitorId: getOrCreateVisitorId(),
@@ -46,6 +48,7 @@
     loading: false,
     sending: false,
     pollTimer: null,
+    ratedSessionId: localStorage.getItem(ratedKey),
   };
 
   const root = document.createElement("div");
@@ -235,6 +238,45 @@
       line-height: 1.45;
     }
 
+    #${ROOT_ID} .tj-feedback {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: -4px 0 12px;
+      color: #64748b;
+      font-size: 12px;
+    }
+
+    #${ROOT_ID} .tj-feedback button,
+    #${ROOT_ID} .tj-rating button {
+      min-width: 32px;
+      height: 32px;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    #${ROOT_ID} .tj-feedback button:hover,
+    #${ROOT_ID} .tj-rating button:hover {
+      border-color: #94a3b8;
+    }
+
+    #${ROOT_ID} .tj-rating {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-top: 1px solid #e2e8f0;
+      padding: 10px 12px 0;
+      color: #334155;
+      font-size: 12.5px;
+      background: #ffffff;
+    }
+
+    #${ROOT_ID} .tj-rating span { margin-right: auto; }
+
     #${ROOT_ID} .tj-powered {
       padding: 8px 12px 10px;
       text-align: center;
@@ -299,6 +341,7 @@
                    <div class="tj-empty">Send a message and your Tajeran support workflow will handle it.</div>`
             }
           </div>
+          ${renderRating()}
           <form class="tj-input-row">
             <input class="tj-input" name="message" placeholder="Write a message..." autocomplete="off" />
             <button class="tj-send" type="submit" style="background:${escapeAttr(brandColor)}" ${state.sending ? "disabled" : ""}>
@@ -337,6 +380,16 @@
       await sendMessage(value);
     }
 
+    root.querySelectorAll("[data-feedback]").forEach((button) => {
+      button.addEventListener("click", () =>
+        sendFeedback(button.getAttribute("data-message-id"), button.getAttribute("data-feedback") === "up"),
+      );
+    });
+
+    root.querySelectorAll("[data-rating]").forEach((button) => {
+      button.addEventListener("click", () => sendRating(Number(button.getAttribute("data-rating"))));
+    });
+
     root.querySelector(".tj-input-row")?.addEventListener("submit", handleSend);
 
     root.querySelector(".tj-send")?.addEventListener("click", handleSend);
@@ -360,9 +413,66 @@
     `;
   }
 
+  function lastAnswerId() {
+    for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+      const message = state.messages[index];
+      if (message.role !== "customer" && message.id) return message.id;
+    }
+    return null;
+  }
+
   function renderMessage(message) {
     const role = message.role === "customer" ? "customer" : "assistant";
-    return `<div class="tj-bubble tj-bubble-${role}">${escapeHtml(message.content || "")}</div>`;
+    const bubble = `<div class="tj-bubble tj-bubble-${role}">${escapeHtml(message.content || "")}</div>`;
+    if (role !== "assistant" || !message.id || message.id !== lastAnswerId()) return bubble;
+    if (message.feedback) return `${bubble}<div class="tj-feedback">Thanks for your feedback.</div>`;
+    const id = escapeAttr(message.id);
+    return `${bubble}
+      <div class="tj-feedback">
+        Was this helpful?
+        <button type="button" data-feedback="up" data-message-id="${id}" aria-label="Yes, this was helpful">👍</button>
+        <button type="button" data-feedback="down" data-message-id="${id}" aria-label="No, this wasn't helpful">👎</button>
+      </div>`;
+  }
+
+  // Ask once per chat, after the customer has had an answer.
+  function renderRating() {
+    if (!state.sessionId || !lastAnswerId()) return "";
+    if (state.ratedSessionId === state.sessionId) return "";
+    return `
+      <div class="tj-rating" role="group" aria-label="Rate this chat">
+        <span>How was this chat?</span>
+        ${[1, 2, 3, 4, 5]
+          .map((score) => `<button type="button" data-rating="${score}" aria-label="${score} out of 5">${score}</button>`)
+          .join("")}
+      </div>`;
+  }
+
+  async function sendFeedback(messageId, helpful) {
+    const message = state.messages.find((item) => item.id === messageId);
+    if (!message || message.feedback) return;
+    message.feedback = helpful ? "helpful" : "not_helpful";
+    renderShell();
+    try {
+      await fetchJson(`${apiBase}/sessions/${state.sessionId}/messages/${messageId}/feedback`, {
+        method: "POST",
+        body: { helpful },
+      });
+    } catch (error) {
+      console.warn("[Tajeran Chat] Failed to send feedback.", error);
+    }
+  }
+
+  async function sendRating(score) {
+    const sessionId = state.sessionId;
+    state.ratedSessionId = sessionId;
+    localStorage.setItem(ratedKey, sessionId);
+    renderShell();
+    try {
+      await fetchJson(`${apiBase}/sessions/${sessionId}/rating`, { method: "POST", body: { score } });
+    } catch (error) {
+      console.warn("[Tajeran Chat] Failed to send rating.", error);
+    }
   }
 
   async function ensureSession() {

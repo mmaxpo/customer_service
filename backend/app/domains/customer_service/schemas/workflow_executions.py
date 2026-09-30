@@ -17,6 +17,8 @@ class CustomerServiceWorkflowExecutionRead(BaseModel):
 
     template_name: str | None = None
     subscription_name: str | None = None
+    workflow_version: int | None = None
+    handed_over: bool = False
     trigger_event_type: str | None = None
 
     conversation_id: UUID | None = None

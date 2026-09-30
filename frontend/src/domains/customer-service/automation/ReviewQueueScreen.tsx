@@ -58,6 +58,9 @@ export default function ReviewQueueScreen() {
                     {run.workflow_name ?? "Workflow run"}
                     {run.version ? <span className="text-text-secondary"> · v{run.version}</span> : null}
                   </p>
+                  {run.customer_message ? (
+                    <p className="mt-0.5 truncate text-[13px] text-text-secondary">&ldquo;{run.customer_message}&rdquo;</p>
+                  ) : null}
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {run.review_reasons.map((reason) => (
                       <ToneChip key={reason} tone={reasonChip[reason].tone}>{reasonChip[reason].label}</ToneChip>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { ChevronRight, LoaderCircle, StickyNote } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -189,13 +190,12 @@ function EntryView({ entry, customerName }: { entry: TimelineEntry; customerName
           </p>
           <time className="shrink-0 pt-px text-[11px] tabular-nums text-text-secondary" dateTime={entry.at}>{formatTime(entry.at)}</time>
         </div>
-        {entry.steps.length ? (
-          <Disclosure label={`${entry.steps.length} ${entry.steps.length === 1 ? "step" : "steps"}`}>
-            <div className="mt-1.5 space-y-2">
-              {entry.steps.map((step) => <EventRow key={step.id} event={step} customerName={customerName} nested />)}
-            </div>
-          </Disclosure>
-        ) : null}
+        <Link
+          href={`/app/workflows/runs/${entry.runId}`}
+          className="mt-0.5 inline-block rounded-control text-[12px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          See what happened
+        </Link>
       </div>
     </div>
   );

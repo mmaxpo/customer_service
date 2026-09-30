@@ -9,6 +9,8 @@ import { customerServiceApi } from "@/domains/customer-service/api";
 import { apiErrorMessage } from "@/platform/api/client";
 import { cn } from "@/platform/utils";
 
+import { topicLabel } from "@/domains/customer-service/model/topics";
+
 import { formatShortAgo, humanize, lower } from "../../case/format";
 
 const FOLDERS: { value: InboxFolder; label: string }[] = [
@@ -79,6 +81,7 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
       {preview ? <p className="truncate text-[12.5px] text-text-secondary">{preview}</p> : null}
       <div className="mt-1 flex min-w-0 items-center gap-2 text-[11.5px] text-text-secondary">
         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-medium text-[10.5px] text-text-secondary">{humanize(item.channel)}</span>
+        {item.topic ? <span className="shrink-0 font-medium text-foreground/80">{topicLabel(item.topic)}</span> : null}
         {URGENT.has(priority) ? (
           <span className={cn("shrink-0 font-medium", priority === "urgent" ? "text-danger" : "text-warning")}>
             {humanize(priority)}
@@ -96,6 +99,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
   const [query, setQuery] = useState("");
   const [view, setView] = useState<QueueView>("all");
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [topic, setTopic] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTag, setBulkTag] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -113,6 +117,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
       if (view === "resolved" && ticketStatus !== "resolved") return false;
       if (view === "priority" && !URGENT.has(priority)) return false;
       if (urgentOnly && !URGENT.has(lower(item.ticket?.priority))) return false;
+      if (topic && item.topic !== topic) return false;
       if (!needle) return true;
       return [item.customer_name, item.customer_email, item.subject, item.latest_message, ...item.tags]
         .filter(Boolean)
@@ -120,7 +125,12 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
         .toLowerCase()
         .includes(needle);
     });
-  }, [items, query, urgentOnly, view]);
+  }, [items, query, urgentOnly, view, topic]);
+
+  const topics = useMemo(
+    () => [...new Set(items.map((item) => item.topic).filter((value): value is string => Boolean(value)))].sort(),
+    [items],
+  );
 
   const viewCounts = useMemo(() => {
     const counts: Record<QueueView, number> = {
@@ -182,16 +192,31 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
           <h2 className="text-[15px] font-semibold text-foreground">Tickets</h2>
           {!loading ? <span className="text-[12px] tabular-nums text-text-secondary">{visible.length} of {items.length}</span> : null}
         </div>
-        <label className="relative block">
-          <span className="sr-only">Search conversations</span>
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary" aria-hidden />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search customer, subject or message"
-            className="h-8 w-full rounded-control border border-border bg-surface pl-8 pr-2 text-[13px] outline-none placeholder:text-text-secondary focus:border-focus focus:ring-2 focus:ring-focus/30"
-          />
-        </label>
+        <div className="flex gap-1.5">
+          <label className="relative block min-w-0 flex-1">
+            <span className="sr-only">Search conversations</span>
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search customer, subject or message"
+              className="h-8 w-full rounded-control border border-border bg-surface pl-8 pr-2 text-[13px] outline-none placeholder:text-text-secondary focus:border-focus focus:ring-2 focus:ring-focus/30"
+            />
+          </label>
+          {topics.length ? (
+            <select
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+              aria-label="Topic"
+              className="h-8 max-w-[8.5rem] shrink-0 rounded-control border border-border bg-surface px-1.5 text-[12.5px] text-foreground outline-none focus:border-focus focus:ring-2 focus:ring-focus/30"
+            >
+              <option value="">All topics</option>
+              {topics.map((value) => (
+                <option key={value} value={value}>{topicLabel(value)}</option>
+              ))}
+            </select>
+          ) : null}
+        </div>
         <div className="-mx-1 flex items-center gap-1 overflow-x-auto pb-0.5" role="tablist" aria-label="Ticket view">
           {VIEWS.map((option) => (
             <button

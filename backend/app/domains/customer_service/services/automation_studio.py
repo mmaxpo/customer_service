@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -35,6 +36,20 @@ from app.runtime.nodes.registry.core import list_registered_nodes
 from app.workflow_operations.versions.repository import WorkflowVersionRepository
 
 RUN_FLAG_REVIEW_TYPE = "run_flag"
+
+# Extra node types a dry run never executes, on top of the runtime's own
+# side-effect list: generic capability calls and tool-using agents can write,
+# waits would stall, sub-workflows are not guarded here.
+DRY_RUN_BLOCKED = {
+    "capability.invoke",
+    "agent.custom",
+    "agent.langgraph",
+    "agent.mcp",
+    "subworkflow.call",
+    "wait.time",
+    "wait.event",
+    "human.approval",
+}
 MAX_OUTPUT_CHARS = 1200
 
 
@@ -86,7 +101,7 @@ def _graph_view(workflow: dict | None, catalog: dict[str, dict]) -> dict:
                 "id": str(node.get("id")),
                 "type": node_type,
                 "label": data.get("label") or _humanize(str(node.get("id"))),
-                "type_title": entry.get("title") or node_type,
+                "type_title": (NODE_LIBRARY.get(node_type) or (None, None))[1] or entry.get("title") or node_type,
                 "category": entry.get("category"),
                 "risk": entry.get("risk_level"),
             }
@@ -129,6 +144,10 @@ def _needs_approval(node_type: str, entry: dict) -> bool:
     return node_type != "human.approval" and entry.get("risk_level") == "sensitive"
 
 
+def _step_name(node: dict) -> str:
+    return (node.get("data") or {}).get("label") or _humanize(str(node.get("id")))
+
+
 def _validate(workflow: dict, catalog: dict[str, dict]) -> list[str]:
     errors = [error.message for error in validate_workflow(workflow, strict=True)]
     nodes = workflow.get("nodes") or []
@@ -151,11 +170,23 @@ def _validate(workflow: dict, catalog: dict[str, dict]) -> list[str]:
         node_type = types[node_id]
         entry = catalog.get(node_type)
         if entry is None:
-            errors.append(f'"{_humanize(node_id)}" uses a step type this workspace does not have ({node_type}).')
+            errors.append(f'"{_step_name(node)}" uses a step type this workspace does not have ({node_type}).')
             continue
         if _needs_approval(node_type, entry) and not has_approval_before(node_id, set()):
-            errors.append(f'"{_humanize(node_id)}" changes customer or order data and needs an approval step before it.')
+            errors.append(f'"{_step_name(node)}" changes customer or order data and needs an approval step before it.')
+        # The template engine only substitutes {{path}}; block helpers render as nothing.
+        if any(
+            isinstance(value, str) and _UNSUPPORTED_TEMPLATE.search(value)
+            for value in (node.get("data") or {}).values()
+        ):
+            errors.append(
+                f'"{_step_name(node)}" uses a placeholder like {{{{#each}}}} or {{{{#if}}}} that isn\'t supported. '
+                "Use {{input}} or {{vars.name}} instead."
+            )
     return errors
+
+
+_UNSUPPORTED_TEMPLATE = re.compile(r"\{\{\s*[#/^>]|\{\{\s*else\s*\}\}")
 
 
 def _edit_summary(base: dict, proposed: dict, catalog: dict[str, dict]) -> list[dict]:
@@ -163,9 +194,7 @@ def _edit_summary(base: dict, proposed: dict, catalog: dict[str, dict]) -> list[
     nodes = {str(n.get("id")): n for n in proposed.get("nodes") or []}
     removed_nodes = {str(n.get("id")): n for n in base.get("nodes") or []}
 
-    def name(node: dict) -> str:
-        return (node.get("data") or {}).get("label") or _humanize(str(node.get("id")))
-
+    name = _step_name
     lines = [{"kind": "new", "text": f"Adds a \"{name(nodes[i])}\" step."} for i in diff["new"]]
     lines += [{"kind": "changed", "text": f"Changes the settings of \"{name(nodes[i])}\"."} for i in diff["changed"]]
     lines += [{"kind": "changed", "text": f"Removes the \"{name(removed_nodes[i])}\" step."} for i in diff["removed"]]
@@ -197,6 +226,11 @@ Rules:
 - Keep exactly one trigger.message node and a reachable response node.
 - Any step that changes money, orders or customer data needs a human.approval
   node before it.
+- Only use config keys listed for a node type in the catalog.
+- Text settings (prompts, messages) support only simple placeholders:
+  {{input}} for the customer's message and {{vars.<key>}} for a value an
+  earlier step saved (a list is inserted whole). No loops, conditions or
+  helpers such as {{#each}} or {{#if}}.
 Return ONLY JSON: {"workflow": {...}, "summary": [{"kind": "new"|"changed"|"same",
 "text": "<one plain sentence a shop owner understands>"}]}.
 Summary: one line per new or changed step, then one "same" line about what
@@ -426,8 +460,15 @@ class AutomationStudioService:
             + ("; needs a human.approval before it" if _needs_approval(t, e) else "")
             + ")"
             + (
-                f' config keys: {sorted((e.get("schema") or {}).get("properties", {}).keys())}'
-                if t in used or e.get("category") in {"logic", "control"}
+                # Exact config keys (with their descriptions) for any step the
+                # draft may add, so the model doesn't invent settings.
+                " config: "
+                + "; ".join(
+                    f'{key}' + (f' ({prop["description"]})' if prop.get("description") else "")
+                    for key, prop in sorted((e.get("schema") or {}).get("properties", {}).items())
+                    if key not in {"nodeType", "node_type", "name", "label"}
+                )
+                if t in used or t in NODE_LIBRARY or e.get("category") in {"logic", "control"}
                 else ""
             )
             for t, e in sorted(catalog.items())
@@ -547,6 +588,7 @@ class AutomationStudioService:
             "base_graph": _graph_view(base["workflow_json"] if base else {}, catalog),
             "diff": _diff(base["workflow_json"] if base else {}, proposed),
             "validation_errors": _validate(proposed, catalog),
+            "test_results": row["evaluation_summary"] or None,
             "recent_conversations": await self._recent_conversations(
                 workspace_id, subscription.id
             ),
@@ -572,7 +614,8 @@ class AutomationStudioService:
                 """
                 UPDATE workflow_versions
                 SET workflow_json = CAST(:workflow AS jsonb),
-                    metadata_json = CAST(:meta AS jsonb)
+                    metadata_json = CAST(:meta AS jsonb),
+                    evaluation_summary = '{}'::jsonb
                 WHERE id = :id AND status = 'draft'
                 """
             ),
@@ -592,6 +635,14 @@ class AutomationStudioService:
         errors = _validate(row["workflow_json"], _catalog())
         if errors:
             raise HTTPException(status_code=422, detail={"validation_errors": errors})
+        tests = row["evaluation_summary"] or {}
+        if not tests.get("tested_at"):
+            raise HTTPException(status_code=409, detail="Test this change on past conversations before publishing.")
+        if any(not c.get("passed") and not c.get("provider_unavailable") for c in tests.get("cases") or []):
+            raise HTTPException(status_code=409, detail="Some past conversations failed with this change. Fix it before publishing.")
+        cases = tests.get("cases") or []
+        if cases and all(c.get("provider_unavailable") for c in cases):
+            raise HTTPException(status_code=409, detail="None of the past conversations could run because the AI provider is unavailable. Test again once it's back.")
 
         subscription, _ = await self._subscription(
             workspace_id, UUID(row["metadata_json"]["subscription_id"])
@@ -611,6 +662,178 @@ class AutomationStudioService:
             {"id": proposal_id},
         )
         await self.db.commit()
+
+    # ------------------------------------------------------------------
+    # Test replay (dry run)
+    # ------------------------------------------------------------------
+
+    async def _dry_run(self, *, workspace_id: UUID, workflow: dict, message: str) -> dict:
+        """Run a draft on a past customer message with every side effect
+        blocked. Nothing is persisted and nothing reaches the customer."""
+        from types import SimpleNamespace
+        from uuid import uuid4
+
+        from app.runtime.execution import execute_workflow_dag
+        from app.runtime.state.run_state import new_run_state
+        from app.runtime.tools import build_tools
+        from app.runtime_services import build_application_runtime_context
+
+        register_application_nodes()
+        guarded = json.loads(json.dumps(workflow))
+        for node in guarded.get("nodes") or []:
+            if _node_type(node) in DRY_RUN_BLOCKED:
+                node.setdefault("data", {})["replay_policy"] = "skip"
+
+        tools = build_tools()
+        ctx = build_application_runtime_context(
+            request=SimpleNamespace(
+                state=SimpleNamespace(tools=tools),
+                app=SimpleNamespace(state=SimpleNamespace(tools=tools)),
+            ),
+            user_id=workspace_id,
+            thread_id=uuid4(),
+            db=self.db,
+            extras={"customer_service": True, "dry_run": True},
+            run_store=None,
+            event_sink=None,
+        )
+        result = await execute_workflow_dag(
+            ctx=ctx,
+            workflow=guarded,
+            message=message,
+            replay_state=new_run_state(message),
+        )
+        meta = result.get("meta") or {}
+        state = meta.get("final_state") or {}
+        nodes = {str(n.get("id")): n for n in guarded.get("nodes") or []}
+        skipped = (state.get("meta") or {}).get("replay", {}).get("skipped_side_effect_nodes", [])
+
+        answer = None
+        for item in skipped:
+            data = (nodes.get(item["node_id"]) or {}).get("data") or {}
+            if item.get("node_type") != "reply.customer_chat":
+                continue
+            source = data.get("message_from", "last")
+            if source == "config":
+                answer = data.get("message")
+            elif source == "vars":
+                answer = (state.get("vars") or {}).get(data.get("message_key", "reply"))
+            else:
+                answer = state.get("last")
+        if answer is None and isinstance(result.get("answer"), str):
+            answer = result["answer"]
+
+        node_meta = (state.get("meta") or {}).get("node_meta_by_id") or {}
+        return {
+            "status": meta.get("status"),
+            "error": meta.get("error"),
+            "answer": answer if isinstance(answer, str) else None,
+            "fallback_used": any((m or {}).get("handoff_required") for m in node_meta.values()),
+            "blocked_steps": [
+                (nodes.get(item["node_id"]) or {}).get("data", {}).get("label")
+                or _humanize(item["node_id"])
+                for item in skipped
+            ],
+        }
+
+    async def test_proposal(self, *, workspace_id: UUID, proposal_id: UUID) -> dict:
+        row = await self._proposal_row(workspace_id, proposal_id)
+        subscription_id = UUID(row["metadata_json"]["subscription_id"])
+        conversations = [
+            c
+            for c in await self._recent_conversations(workspace_id, subscription_id)
+            if c["customer_message"]
+        ]
+        cases = []
+        for conversation in conversations:
+            try:
+                outcome = await self._dry_run(
+                    workspace_id=workspace_id,
+                    workflow=row["workflow_json"],
+                    message=conversation["customer_message"],
+                )
+            except Exception as exc:  # a broken draft must not break the page
+                outcome = {"status": "error", "error": str(exc), "answer": None, "fallback_used": False, "blocked_steps": []}
+            provider_down = "llm_" in str(outcome["error"] or "").lower()
+            before = (conversation["answer"] or "").strip()
+            after = (outcome["answer"] or "").strip()
+            cases.append(
+                {
+                    **conversation,
+                    "draft_status": outcome["status"],
+                    "draft_error": _truncate(outcome["error"]),
+                    "draft_answer": outcome["answer"],
+                    "fallback_used": outcome["fallback_used"],
+                    "blocked_steps": outcome["blocked_steps"],
+                    "provider_unavailable": provider_down,
+                    "passed": outcome["status"] == "ok" and not outcome["error"],
+                    "changed": bool(after) and after != before,
+                }
+            )
+        results = {
+            "tested_at": datetime.now(timezone.utc).isoformat(),
+            "total": len(cases),
+            "passed": sum(1 for c in cases if c["passed"]),
+            "changed": sum(1 for c in cases if c["changed"]),
+            "untested": sum(1 for c in cases if c["provider_unavailable"]),
+            "cases": cases,
+        }
+        await self.db.execute(
+            text("UPDATE workflow_versions SET evaluation_summary = CAST(:r AS jsonb) WHERE id = :id"),
+            {"id": proposal_id, "r": json.dumps(results, default=str)},
+        )
+        await self.db.commit()
+        return json.loads(json.dumps(results, default=str))
+
+    # ------------------------------------------------------------------
+    # Version history
+    # ------------------------------------------------------------------
+
+    async def version_history(self, *, workspace_id: UUID, subscription_id: UUID) -> dict:
+        subscription, _ = await self._subscription(workspace_id, subscription_id)
+        meta = subscription.meta or {}
+        versions = []
+        if meta.get("definition_id"):
+            rows = await self.versions.list_versions(definition_id=UUID(meta["definition_id"]))
+            versions = [
+                {
+                    "id": str(row["id"]),
+                    "version": row["version"],
+                    "status": row["status"],
+                    "kind": (row["metadata_json"] or {}).get("kind"),
+                    "note": row["notes"],
+                    "summary": (row["metadata_json"] or {}).get("summary") or [],
+                    "created_at": row["created_at"],
+                    "published_at": row["published_at"],
+                }
+                for row in rows
+                if row["status"] != "discarded"
+            ]
+        return {
+            "workflow_id": str(subscription.id),
+            "workflow_name": subscription.name,
+            "live_version": meta.get("live_version"),
+            "versions": versions,
+        }
+
+    async def restore_version(
+        self, *, workspace_id: UUID, subscription_id: UUID, version: int
+    ) -> dict:
+        """Make an earlier published version live again (undo)."""
+        subscription, _ = await self._subscription(workspace_id, subscription_id)
+        meta = subscription.meta or {}
+        if not meta.get("definition_id"):
+            raise HTTPException(status_code=404, detail="This workflow has no version history yet.")
+        definition_id = UUID(meta["definition_id"])
+        target = await self.versions.get_version(definition_id=definition_id, version=version)
+        if target is None or target["status"] not in {"published", "archived"}:
+            raise HTTPException(status_code=409, detail="Only versions that were live can be restored.")
+
+        await self.versions.publish_version(definition_id=definition_id, version=version)
+        subscription.workflow_json = target["workflow_json"]
+        subscription.meta = {**meta, "live_version": version}
+        await self.db.commit()
+        return {"workflow_id": str(subscription.id), "live_version": version}
 
     async def _recent_conversations(self, workspace_id: UUID, subscription_id: UUID) -> list[dict]:
         # Real past answers from this workflow, shown as the "before" side.
@@ -657,6 +880,7 @@ class AutomationStudioService:
     _RUNS_SQL = """
         SELECT r.workflow_run_id, r.thread_id, r.status, r.created_at, r.updated_at,
                r.extra, job.subscription_id, job.subscription_name, job.version,
+               job.customer_message, job.final_run_id,
                EXISTS (
                  SELECT 1 FROM workflow_run_events e
                  WHERE e.workflow_run_id = r.workflow_run_id
@@ -675,7 +899,9 @@ class AutomationStudioService:
         LEFT JOIN LATERAL (
           SELECT j.payload->'extras'->'subscription'->>'id' AS subscription_id,
                  j.payload->'extras'->'subscription'->>'name' AS subscription_name,
-                 j.payload->'extras'->'workflow_version' AS version
+                 j.payload->'extras'->'workflow_version' AS version,
+                 j.payload->>'message' AS customer_message,
+                 j.result->'meta'->>'workflow_run_id' AS final_run_id
           FROM platform_jobs j
           WHERE j.user_id = r.user_id AND j.job_type = 'workflow.run'
             AND (j.result->'meta'->>'workflow_run_id' = r.workflow_run_id::text
@@ -706,6 +932,7 @@ class AutomationStudioService:
             "workflow_name": row.subscription_name,
             "version": row.version,
             "created_at": row.created_at,
+            "customer_message": _truncate(row.customer_message),
             "review_reasons": reasons,
         }
 
@@ -721,7 +948,12 @@ class AutomationStudioService:
             ),
             {"workspace_id": workspace_id, "flag_type": RUN_FLAG_REVIEW_TYPE},
         )
-        runs = [self._run_summary(row) for row in result]
+        # A retried job leaves one run per attempt; only its final run counts.
+        runs = [
+            self._run_summary(row)
+            for row in result
+            if not row.final_run_id or row.final_run_id == str(row.workflow_run_id)
+        ]
         return [run for run in runs if run["review_reasons"]]
 
     async def run_detail(self, *, workspace_id: UUID, run_id: UUID) -> dict:

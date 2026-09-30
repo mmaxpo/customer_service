@@ -467,7 +467,8 @@ class ConversationTimelineService:
                 self._event(
                     type="workflow_execution",
                     timestamp=execution["created_at"],
-                    title=execution.get("workflow_name")
+                    title=execution.get("subscription_name")
+                    or execution.get("workflow_name")
                     or execution.get("template_name")
                     or "Workflow execution",
                     description=execution.get("message"),
@@ -482,6 +483,8 @@ class ConversationTimelineService:
                         "job_type": execution.get("job_type"),
                         "template_name": execution.get("template_name"),
                         "subscription_name": execution.get("subscription_name"),
+                        "workflow_version": execution.get("workflow_version"),
+                        "handed_over": execution.get("handed_over"),
                         "trigger_event_type": execution.get("trigger_event_type"),
                         "ticket_id": execution.get("ticket_id"),
                         "customer_id": execution.get("customer_id"),

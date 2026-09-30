@@ -39,6 +39,13 @@ export function isCaseClosed(context: ConversationContext | null, conversation: 
   return CLOSED.has(lower(context?.ticket?.status)) || CLOSED.has(lower(conversation?.status));
 }
 
+// The newest run finished but a step asked for a person (e.g. the AI provider
+// was down and the customer got the standby reply), and no teammate has replied since.
+export function handedOverExecution(context: ConversationContext | null, conversation: ConversationDetail | null) {
+  const latest = newestExecution(context?.workflow_executions ?? []);
+  return latest?.handed_over && lastVisibleSender(conversation) !== "agent" ? latest : null;
+}
+
 export function failedExecution(context: ConversationContext | null) {
   const latest = newestExecution(context?.workflow_executions ?? []);
   return latest && FAILED.has(lower(latest.status)) ? latest : null;
@@ -57,6 +64,13 @@ export function deriveCaseState(
   }
   if (failedExecution(context)) {
     return { label: "Action failed", tone: "failure", description: "The latest workflow for this case failed." };
+  }
+  if (handedOverExecution(context, conversation)) {
+    return {
+      label: "Needs a person",
+      tone: "attention",
+      description: "The workflow couldn't answer and handed this case to your team.",
+    };
   }
   const pending = pendingSuggestions(context);
   if (pending.length > 0) {
@@ -141,6 +155,9 @@ export function pickNextStep(
 
   const pending = pendingSuggestions(context);
   if (pending.length > 0) return { kind: "suggestion", action: pending[0], more: pending.length - 1 };
+
+  // A handed-over case needs a teammate's reply, not closing.
+  if (handedOverExecution(context, conversation)) return null;
 
   const sender = lastVisibleSender(conversation);
   if ((sender === "agent" || sender === "ai") && context.ticket) {

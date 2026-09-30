@@ -49,19 +49,18 @@ function WorkflowCard({ workflow }: { workflow: StudioWorkflow }) {
         </Link>
       ) : null}
 
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-[12.5px] tabular-nums text-text-secondary">
-        <span>
-          {workflow.runs_7d} {workflow.runs_7d === 1 ? "chat" : "chats"}
+      <div className="mt-auto border-t border-border pt-3 text-[12.5px] tabular-nums text-text-secondary">
+        <p>
+          {workflow.runs_7d} {workflow.runs_7d === 1 ? "chat" : "chats"} in 7 days
           {answeredRate !== null ? (
-            <span className={answeredRate > 0 ? "ml-2 text-commerce-accent" : "ml-2"}>{answeredRate}% answered</span>
+            <span className={answeredRate > 0 ? "text-commerce-accent" : undefined}> · {answeredRate}% answered</span>
           ) : null}
-        </span>
-        <span className="flex items-center gap-3">
-          <span>edited {formatShortAgo(workflow.edited_at)}</span>
-          <Link href={`/app/workflows/edit/${workflow.id}`} className="font-sans font-medium text-primary hover:underline">
-            Edit steps
-          </Link>
-        </span>
+          <span> · edited {formatShortAgo(workflow.edited_at)}</span>
+        </p>
+        <div className="mt-2 flex gap-4 font-medium">
+          <Link href={`/app/workflows/edit/${workflow.id}`} className="text-primary hover:underline">Edit steps</Link>
+          <Link href={`/app/workflows/history/${workflow.id}`} className="text-primary hover:underline">Version history</Link>
+        </div>
       </div>
     </li>
   );

@@ -26,6 +26,7 @@ class InboxItem(BaseModel):
     moderation_status: str = "normal"
     moderation_reason: str | None = None
     tags: list[str] = Field(default_factory=list)
+    topic: str | None = None
     ticket: InboxTicketSummary | None = None
 
     model_config = {"from_attributes": True}

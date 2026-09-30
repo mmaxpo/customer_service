@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.customer_service.models.tickets import Ticket
@@ -157,7 +157,30 @@ class CustomerServiceWorkflowExecutionService:
             offset=offset,
         )
 
-        return [self._normalize(job) for job in jobs]
+        executions = [self._normalize(job) for job in jobs]
+        handed_over = await self._handed_over_runs(
+            [e["workflow_run_id"] for e in executions if e["workflow_run_id"]]
+        )
+        for execution in executions:
+            execution["handed_over"] = str(execution["workflow_run_id"]) in handed_over
+        return executions
+
+    async def _handed_over_runs(self, run_ids: list) -> set[str]:
+        # A run "succeeds" even when a step gave up and asked for a person
+        # (AI provider down, fallback reply); the inbox must not call that answered.
+        if not run_ids:
+            return set()
+        result = await self.repo.db.execute(
+            text(
+                """
+                SELECT DISTINCT workflow_run_id::text FROM workflow_run_events
+                WHERE workflow_run_id::text = ANY(:ids)
+                  AND event->'meta'->>'handoff_required' = 'true'
+                """
+            ),
+            {"ids": [str(r) for r in run_ids]},
+        )
+        return set(result.scalars().all())
 
     async def get(
         self,
@@ -270,6 +293,7 @@ class CustomerServiceWorkflowExecutionService:
             "job_type": job.job_type,
             "template_name": workflow.get("name"),
             "subscription_name": subscription.get("name"),
+            "workflow_version": extras.get("workflow_version"),
             "trigger_event_type": event.get("event_type"),
             "conversation_id": event_payload.get("conversation_id"),
             "ticket_id": event_payload.get("ticket_id"),

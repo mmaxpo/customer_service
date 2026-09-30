@@ -5,6 +5,7 @@ import AppContainer from "@/ui/layout/AppContainer";
 import PageHeader from "@/ui/layout/PageHeader";
 import { ProductNotice, ProductPanel } from "@/ui/product";
 import { workspaceApi, type Workspace, type WorkspaceMember } from "@/domains/workspace/api/workspace";
+import { SettingsTabs } from "@/domains/workspace/SettingsTabs";
 
 const timezones = ["UTC", "Europe/London", "Europe/Berlin", "Asia/Tehran", "America/New_York", "America/Los_Angeles"];
 
@@ -76,6 +77,7 @@ export default function SettingsPage() {
   return (
     <AppContainer>
       <PageHeader eyebrow="Workspace" title="Settings" description="Configure the identity, working hours, and people behind your customer-support workspace." />
+      <SettingsTabs />
       {status && <ProductNotice>{status}</ProductNotice>}
       {loading ? <ProductPanel title="Loading workspace" description="Reading your workspace settings and team roster."><div className="h-12" /></ProductPanel> : (
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">

@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class KnowledgeSearchConfig(BaseModel):
-    query: str = Field("", description="Query (or vars.query)")
+    query: str = Field("", description="What to search for. Leave empty to search the customer's message.")
     k: int = Field(8, ge=1, le=20)
     artifact_as: str = Field("kb_hits", description="vars key to store hits list")
 
@@ -13,9 +13,10 @@ class KnowledgeSearchNode:
     """
     Search the user's knowledge base.
 
-    Reads query from:
+    Reads query from, in order:
         - config.query
         - state.vars["query"]
+        - state.vars["input"] (the incoming message)
 
     Stores hits in:
         state.vars[artifact_as]
@@ -31,9 +32,9 @@ class KnowledgeSearchNode:
     async def run(self, ctx, state: dict, config: KnowledgeSearchConfig) -> dict:
         vars_ = state.get("vars") or {}
 
-        query = config.query or str(vars_.get("query") or "")
+        query = config.query or str(vars_.get("query") or vars_.get("input") or "")
         if not query.strip():
-            raise ValueError("kb.search: query is empty (config.query or vars.query)")
+            raise ValueError("kb.search: query is empty (config.query, vars.query or vars.input)")
 
         tools = ctx.request.state.tools
         result = await tools.knowledge_search.search(

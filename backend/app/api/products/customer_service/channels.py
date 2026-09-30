@@ -4,9 +4,11 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import get_db
+from app.domains.customer_service.services.customer_feedback import CustomerFeedbackService
 from app.domains.customer_service.integrations.omnichannel.providers import (
     register_default_omnichannel_providers,
 )
@@ -537,9 +539,63 @@ async def list_public_messages(
             "role": m.role,
             "content": m.content,
             "created_at": m.created_at,
+            "feedback": m.meta.get("customer_feedback") if isinstance(m.meta, dict) else None,
         }
         for m in messages
     ]
+
+
+async def _public_session(db: AsyncSession, public_key: str, session_id: UUID):
+    service = build_service(db)
+    settings = await service.get_widget_settings_by_public_key(public_key=public_key)
+    if settings is None or not settings.enabled:
+        raise HTTPException(status_code=404, detail="Chat widget not found")
+    session = await service.get_session(session_id=session_id)
+    if session is None or session.user_id != settings.user_id:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return session
+
+
+class AnswerFeedbackRequest(BaseModel):
+    helpful: bool
+
+
+class ChatRatingRequest(BaseModel):
+    score: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+@chat_router.post("/public/{public_key}/sessions/{session_id}/messages/{message_id}/feedback")
+async def answer_feedback(
+    public_key: str,
+    session_id: UUID,
+    message_id: UUID,
+    payload: AnswerFeedbackRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    session = await _public_session(db, public_key, session_id)
+    return await CustomerFeedbackService(db).answer_feedback(
+        workspace_id=session.user_id,
+        session_id=session.id,
+        message_id=message_id,
+        helpful=payload.helpful,
+    )
+
+
+@chat_router.post("/public/{public_key}/sessions/{session_id}/rating")
+async def rate_chat(
+    public_key: str,
+    session_id: UUID,
+    payload: ChatRatingRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    session = await _public_session(db, public_key, session_id)
+    return await CustomerFeedbackService(db).rate_chat(
+        workspace_id=session.user_id,
+        session_id=session.id,
+        score=payload.score,
+        comment=(payload.comment or "").strip() or None,
+    )
 
 
 # ============================================================

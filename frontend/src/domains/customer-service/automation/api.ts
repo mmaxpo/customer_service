@@ -60,6 +60,27 @@ export type Proposal = {
   diff: { new: string[]; changed: string[]; removed: string[] };
   validation_errors: string[];
   recent_conversations: RecentConversation[];
+  test_results: TestResults | null;
+};
+
+export type TestCase = RecentConversation & {
+  draft_status: string | null;
+  draft_error: string | null;
+  draft_answer: string | null;
+  fallback_used: boolean;
+  blocked_steps: string[];
+  provider_unavailable: boolean;
+  passed: boolean;
+  changed: boolean;
+};
+
+export type TestResults = {
+  tested_at: string;
+  total: number;
+  passed: number;
+  changed: number;
+  untested: number;
+  cases: TestCase[];
 };
 
 export type RawNode = { id: string; data: Record<string, unknown> & { nodeType: string; label?: string } };
@@ -93,6 +114,24 @@ export type LibraryItem = {
   schema: { properties?: Record<string, JsonSchemaProperty>; required?: string[] };
 };
 
+export type WorkflowVersion = {
+  id: string;
+  version: number;
+  status: "draft" | "published" | "archived";
+  kind: "import" | "proposal" | null;
+  note: string | null;
+  summary: SummaryLine[];
+  created_at: string;
+  published_at: string | null;
+};
+
+export type VersionHistory = {
+  workflow_id: string;
+  workflow_name: string;
+  live_version: number | null;
+  versions: WorkflowVersion[];
+};
+
 export type ReviewReason = "flagged" | "failed" | "handed_over";
 
 export type RunSummary = {
@@ -103,6 +142,7 @@ export type RunSummary = {
   workflow_name: string | null;
   version: number | null;
   created_at: string;
+  customer_message: string | null;
   review_reasons: ReviewReason[];
 };
 
@@ -149,6 +189,13 @@ export const studioApi = {
 
   workflow: (id: string) => apiJson<WorkflowDetail>(`${base}/workflows/${id}`),
 
+  versions: (id: string) => apiJson<VersionHistory>(`${base}/workflows/${id}/versions`),
+
+  restoreVersion: (id: string, version: number) =>
+    apiJson<{ workflow_id: string; live_version: number }>(`${base}/workflows/${id}/versions/${version}/restore`, {
+      method: "POST",
+    }),
+
   nodeLibrary: () => apiJson<LibraryItem[]>(`${base}/node-library`),
 
   proposeGraphEdit: (workflowId: string, workflow: RawWorkflow) =>
@@ -164,6 +211,8 @@ export const studioApi = {
       method: "POST",
       body: jsonBody({ request }),
     }),
+
+  testProposal: (id: string) => apiJson<TestResults>(`${base}/proposals/${id}/test`, { method: "POST" }),
 
   publishProposal: (id: string) =>
     apiJson<{ workflow_id: string; live_version: number }>(`${base}/proposals/${id}/publish`, {

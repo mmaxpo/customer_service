@@ -38,11 +38,11 @@ function causeNote(run: RunDetail, label: (id: string) => string): string | null
 
 function stepDecoration(step: RunStep | undefined, isCause: boolean, node: GraphNode): NodeDecoration {
   const duration = formatDuration(step?.duration_ms);
-  if (isCause) return { tone: "cause", tag: "Likely cause", sub: duration ?? node.type };
-  if (!step) return { tone: "skipped", tag: "Not run", sub: node.type };
-  if (step.status === "error") return { tone: "error", tag: "Error", sub: node.type };
-  if (step.status === "skipped") return { tone: "skipped", tag: "Skipped", sub: node.type };
-  return { sub: duration ? `${node.type} · ${duration}` : node.type };
+  if (isCause) return { tone: "cause", tag: "Likely cause", sub: duration ?? node.type_title };
+  if (!step) return { tone: "skipped", tag: "Not run", sub: node.type_title };
+  if (step.status === "error") return { tone: "error", tag: "Error", sub: node.type_title };
+  if (step.status === "skipped") return { tone: "skipped", tag: "Skipped", sub: node.type_title };
+  return { sub: duration ? `${node.type_title} · ${duration}` : node.type_title };
 }
 
 export default function RunReviewScreen({ runId }: { runId: string }) {
@@ -154,7 +154,7 @@ export default function RunReviewScreen({ runId }: { runId: string }) {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 overflow-y-auto lg:auto-rows-auto lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Left: the conversation */}
         <aside className="min-h-0 overflow-y-auto border-b border-border bg-surface p-4 lg:border-b-0 lg:border-r">
           <SectionLabel>Conversation</SectionLabel>
@@ -213,7 +213,7 @@ export default function RunReviewScreen({ runId }: { runId: string }) {
         {/* Center: what happened */}
         <section className="flex min-h-0 flex-col overflow-auto bg-background p-4" aria-label="What happened in this conversation">
           <SectionLabel>What happened in this conversation</SectionLabel>
-          <div className="mt-4 flex-1 overflow-x-auto pb-4">
+          <div className="mt-4 shrink-0 overflow-x-auto pb-4 lg:flex-1">
             <WorkflowGraph
               graph={run.graph}
               selectedId={selected}

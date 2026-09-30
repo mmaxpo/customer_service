@@ -121,7 +121,7 @@ export function NextStep({ step, conversationId, decision }: Props) {
               <CircleAlert size={18} className="mt-px shrink-0 text-danger" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-foreground">
-                  Workflow failed: {step.execution.workflow_name ?? step.execution.template_name ?? humanize(step.execution.job_type ?? "workflow")}
+                  Workflow failed: {step.execution.subscription_name ?? step.execution.workflow_name ?? step.execution.template_name ?? humanize(step.execution.job_type ?? "workflow")}
                 </p>
                 {step.execution.error_message ? (
                   <p className="mt-0.5 line-clamp-2 text-[12.5px] text-text-secondary">{step.execution.error_message}</p>
@@ -129,7 +129,7 @@ export function NextStep({ step, conversationId, decision }: Props) {
               </div>
               {step.execution.workflow_run_id ? (
                 <Link
-                  href={`/app/runs/${step.execution.workflow_run_id}`}
+                  href={`/app/workflows/runs/${step.execution.workflow_run_id}`}
                   className="shrink-0 rounded-control px-2 py-1 text-[13px] font-medium text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   View run

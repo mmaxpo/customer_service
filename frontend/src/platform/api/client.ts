@@ -27,8 +27,26 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     });
 }
 
+// Access tokens are short-lived; one shared refresh serves every request
+// that hit a 401 at the same time. Refresh tokens rotate, so never run two.
+let refreshing: Promise<boolean> | null = null;
+const NO_REFRESH = new Set(["/api/auth/login", "/api/auth/refresh"]);
+
+function refreshSession(): Promise<boolean> {
+    refreshing ??= apiFetch("/api/auth/refresh", { method: "POST" })
+        .then((res) => res.ok)
+        .catch(() => false)
+        .finally(() => {
+            refreshing = null;
+        });
+    return refreshing;
+}
+
 export async function apiJson<T = any>(path: string, init: RequestInit = {}): Promise<T> {
-    const res = await apiFetch(path, init);
+    let res = await apiFetch(path, init);
+    if (res.status === 401 && typeof window !== "undefined" && !NO_REFRESH.has(path) && (await refreshSession())) {
+        res = await apiFetch(path, init);
+    }
     const text = await res.text();
 
     if (!res.ok) {

@@ -125,7 +125,7 @@ export default function WorkflowEditorScreen({ workflowId }: { workflowId: strin
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[260px_minmax(0,1fr)_340px] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 overflow-y-auto lg:auto-rows-auto lg:grid-cols-[260px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Left: node library */}
         <aside className="min-h-0 overflow-y-auto border-b border-border bg-surface p-4 lg:border-b-0 lg:border-r" aria-label="Step library">
           <SectionLabel>Add a step</SectionLabel>
@@ -168,9 +168,9 @@ export default function WorkflowEditorScreen({ workflowId }: { workflowId: strin
         </aside>
 
         {/* Center: the graph */}
-        <section className="flex min-h-0 flex-col overflow-auto bg-background p-4" aria-label="Workflow graph">
+        <section className="order-first flex min-h-0 flex-col overflow-auto bg-background p-4 lg:order-none" aria-label="Workflow graph">
           <SectionLabel>{detail.name}</SectionLabel>
-          <div className="mt-4 flex-1 overflow-x-auto pb-4">
+          <div className="mt-4 shrink-0 overflow-x-auto pb-4 lg:flex-1">
             <WorkflowGraph
               graph={graph}
               selectedId={selected}

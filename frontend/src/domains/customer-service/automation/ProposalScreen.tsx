@@ -10,8 +10,8 @@ import { cn } from "@/platform/utils";
 import { Button } from "@/ui/primitives/button";
 import { ConfirmDialog } from "@/ui/overlay/ConfirmDialog";
 
-import { formatDay, formatTime } from "../inbox/case/format";
 import { ToneChip } from "../inbox/case/parts";
+import { ProposalTestPanel, testsAllowPublish } from "./ProposalTestPanel";
 import { WorkflowGraph, type NodeDecoration } from "./WorkflowGraph";
 import { studioApi, type Graph, type GraphNode, type Proposal, type SummaryLine } from "./api";
 
@@ -43,7 +43,7 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refineText, setRefineText] = useState("");
-  const [busy, setBusy] = useState<"refine" | "publish" | "discard" | null>(null);
+  const [busy, setBusy] = useState<"refine" | "test" | "publish" | "discard" | null>(null);
   const [confirmPublish, setConfirmPublish] = useState(false);
 
   useEffect(() => {
@@ -76,6 +76,7 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
 
   const isDraft = proposal.status === "draft";
   const blocked = proposal.validation_errors.length > 0;
+  const canPublish = !blocked && testsAllowPublish(proposal.test_results);
   const touched = new Set([...proposal.diff.new, ...proposal.diff.changed]);
 
   const refine = async (event: React.FormEvent) => {
@@ -88,6 +89,19 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
       setRefineText("");
     } catch (err) {
       setError(apiErrorMessage(err, "TCOS could not update this change."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runTest = async () => {
+    setBusy("test");
+    setError(null);
+    try {
+      const results = await studioApi.testProposal(proposal.id);
+      setProposal({ ...proposal, test_results: results });
+    } catch (err) {
+      setError(apiErrorMessage(err, "Could not test this change."));
     } finally {
       setBusy(null);
     }
@@ -137,7 +151,7 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
           {isDraft ? (
             <>
               <Button variant="secondary" size="sm" disabled={busy !== null} onClick={() => void discard()}>Discard</Button>
-              <Button size="sm" disabled={busy !== null || blocked} onClick={() => setConfirmPublish(true)}>
+              <Button size="sm" disabled={busy !== null || !canPublish} onClick={() => setConfirmPublish(true)}>
                 Publish v{proposal.version}
               </Button>
             </>
@@ -145,7 +159,7 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 overflow-y-auto lg:auto-rows-auto lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Left: what was asked, what changes, refine */}
         <aside className="flex min-h-0 flex-col border-b border-border bg-surface lg:border-b-0 lg:border-r">
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -241,37 +255,12 @@ export default function ProposalScreen({ proposalId }: { proposalId: string }) {
                 </p>
               </div>
             )}
-            <p className="text-[12.5px] leading-5 text-text-secondary">
-              Replaying past conversations against a draft isn&apos;t available yet. Compare with how v{proposal.base_version} answered recently:
-            </p>
-
-            {proposal.recent_conversations.length ? (
-              <ul className="space-y-2">
-                {proposal.recent_conversations.map((conversation) => (
-                  <li key={conversation.run_id} className="rounded-container border border-border p-3">
-                    <p className="text-[11.5px] text-text-secondary">
-                      {formatDay(conversation.created_at)} at {formatTime(conversation.created_at)}
-                    </p>
-                    <p className="mt-1 text-[13px] font-medium text-foreground">
-                      &ldquo;{conversation.customer_message ?? "Message not found"}&rdquo;
-                    </p>
-                    {conversation.answer ? (
-                      <p className="mt-1.5 rounded bg-muted px-2 py-1.5 text-[12.5px] leading-5 text-text-secondary">{conversation.answer}</p>
-                    ) : null}
-                    <Link href={`/app/workflows/runs/${conversation.run_id}`} className="mt-1.5 inline-block text-[12.5px] font-medium text-primary hover:underline">
-                      See what happened
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[13px] text-text-secondary">This workflow hasn&apos;t handled a conversation yet.</p>
-            )}
+            <ProposalTestPanel proposal={proposal} testing={busy === "test"} onTest={() => void runTest()} />
             {error ? <p role="alert" className="text-[12.5px] text-danger">{error}</p> : null}
           </div>
           {isDraft ? (
             <div className="flex gap-2 border-t border-border p-3">
-              <Button className="flex-1" disabled={busy !== null || blocked} onClick={() => setConfirmPublish(true)}>
+              <Button className="flex-1" disabled={busy !== null || !canPublish} onClick={() => setConfirmPublish(true)}>
                 Publish as v{proposal.version}
               </Button>
               <Button variant="secondary" disabled={busy !== null} onClick={() => router.push("/app/workflows")}>

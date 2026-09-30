@@ -22,6 +22,7 @@ export type InboxItem = {
   moderation_status: string;
   moderation_reason: string | null;
   tags: string[];
+  topic: string | null;
   ticket: InboxTicketSummary | null;
 };
 
@@ -222,6 +223,8 @@ export type WorkflowExecution = {
   event_type?: string | null;
   trigger_event_type?: string | null;
   subscription_name?: string | null;
+  workflow_version?: number | null;
+  handed_over?: boolean;
   channel?: string | null;
 
   message?: string | null;

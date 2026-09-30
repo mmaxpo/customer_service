@@ -1,7 +1,6 @@
 import {
   Activity,
   BookOpen,
-  Cable,
   ChartColumn,
   CreditCard,
   Inbox,
@@ -36,7 +35,7 @@ export const primaryNav: NavGroup[] = [
   {
     label: "Supervise",
     items: [
-      { href: "/app/runs", label: "Live", icon: Activity },
+      { href: "/app/live", label: "Live", icon: Activity },
       { href: "/app/dashboard", label: "Desk", icon: ChartColumn },
     ],
   },
@@ -51,7 +50,6 @@ export const primaryNav: NavGroup[] = [
 ];
 
 export const configurationNav: NavItem[] = [
-  { href: "/app/channels", label: "Channels", icon: Cable },
   { href: "/app/settings", label: "Settings", icon: Settings },
   { href: "/app/billing", label: "Billing", icon: CreditCard },
 ];
