@@ -36,12 +36,14 @@ def reply_language_rule(setting: dict | None, default_locale: str | None) -> str
     allowed = [LANGUAGES[code] for code in setting.get("languages") or [] if code in LANGUAGES]
     if allowed:
         return (
-            "Write the reply in the language of the customer message above if it is one of: "
+            "Write the reply in the language of the latest customer message (the "
+            "'Customer message' at the top, not the earlier messages) if it is one of: "
             f"{', '.join(allowed)}. Otherwise write the reply in {default}."
         )
     return (
-        "Write the reply in the language of the customer message above: English for "
-        "an English message, German for a German message, and so on."
+        "Write the reply in the language of the latest customer message (the "
+        "'Customer message' at the top, not the earlier messages): English for an "
+        "English message, German for a German message, and so on."
     )
 
 
