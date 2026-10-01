@@ -236,6 +236,8 @@ class WorkspaceInvitationRead(BaseModel):
     status: str
     expires_at: datetime
     created_at: datetime
+    # Only on create and resend: the link the admin can pass on by hand.
+    invite_link: str | None = None
 
     model_config = {"from_attributes": True}
 

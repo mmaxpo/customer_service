@@ -18,6 +18,7 @@ export type Workspace = {
 export type WorkspaceMember = {
   id: string;
   user_id: string;
+  invitation_id?: string | null;
   role: string;
   status: string;
   state?: string;
@@ -27,6 +28,8 @@ export type WorkspaceMember = {
 };
 
 export type WorkspaceInvitation = {
+  // Returned when an invitation is created or resent, so it can be passed on by hand.
+  invite_link?: string | null;
   id: string;
   email: string;
   role: string;
@@ -57,6 +60,14 @@ export const workspaceApi = {
       method: "POST",
       body: jsonBody(payload),
     });
+  },
+
+  resendInvitation(workspaceId: string, invitationId: string) {
+    return apiJson<WorkspaceInvitation>(`${base}/${workspaceId}/invitations/${invitationId}/resend`, { method: "POST" });
+  },
+
+  revokeInvitation(workspaceId: string, invitationId: string) {
+    return apiJson<WorkspaceInvitation>(`${base}/${workspaceId}/invitations/${invitationId}/revoke`, { method: "POST" });
   },
 
   updateMember(workspaceId: string, userId: string, payload: { role?: string; status?: string }) {

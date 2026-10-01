@@ -9,6 +9,7 @@ import { ThemeSwitch } from "./ThemeSwitch";
 
 const tabs = [
   { href: "/app/settings", label: "Workspace" },
+  { href: "/app/settings/team", label: "Team" },
   { href: "/app/settings/connections", label: "Connections" },
   { href: "/app/settings/chat-widget", label: "Chat widget" },
 ];

@@ -47,6 +47,10 @@ from app.tenancy.usage import WorkspaceUsageService
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 
+def _invitation_link(token: str) -> str:
+    return f"{settings.WEB_APP_URL.rstrip('/')}/invite/accept?{urlencode({'token': token})}"
+
+
 def _send_invitation_email(
     *,
     to: str,
@@ -55,8 +59,7 @@ def _send_invitation_email(
     token: str,
     expires_at: datetime,
 ) -> None:
-    query = urlencode({"token": token})
-    link = f"{settings.WEB_APP_URL.rstrip('/')}/invite/accept?{query}"
+    link = _invitation_link(token)
     safe_link = html.escape(link, quote=True)
     safe_workspace = html.escape(workspace_name)
     safe_role = html.escape(role)
@@ -412,7 +415,9 @@ async def create_workspace_invitation(
         token=token,
         expires_at=invitation.expires_at,
     )
-    return WorkspaceInvitationRead.model_validate(invitation)
+    return WorkspaceInvitationRead.model_validate(invitation).model_copy(
+        update={"invite_link": _invitation_link(token)}
+    )
 
 
 @router.post(
@@ -446,7 +451,9 @@ async def resend_workspace_invitation(
         token=token,
         expires_at=invitation.expires_at,
     )
-    return WorkspaceInvitationRead.model_validate(invitation)
+    return WorkspaceInvitationRead.model_validate(invitation).model_copy(
+        update={"invite_link": _invitation_link(token)}
+    )
 
 
 @router.post(

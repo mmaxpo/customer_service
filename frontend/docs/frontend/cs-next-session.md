@@ -193,6 +193,16 @@ Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/b
 - Inbox separation (committed `aebc0886`): tinted list and customer panel, white case area, tinted case header; customer / Tajeran / team / note entries each have their own colour.
 - Not converted (still fixed colours): the unused `AppSidebar`, the logo mark, the old mission-board and builder screens, public and auth pages, and the chat widget on the store.
 
+## 3c. Team (2026-10-01, **not committed yet**, invite flow not exercised)
+- Settings → **Team** tab (`domains/workspace/TeamScreen.tsx`, `/app/settings/team`): invite by email + role (Agent / Manager / Admin), the invite link shown for copying (create and resend now return `invite_link`), member list with role change and Deactivate / Reactivate, Resend / Cancel for pending invites, and a plain "what each role can do" guide (mirrors `ROLE_PERMISSIONS` in `security/rbac.py`). The older Team panel on the Workspace tab is still there.
+- Owner's decisions: invite link (the teammate sets their own password), fixed roles, team panel before collaboration features.
+- **Blocking gaps found (invited teammates cannot join today):**
+  1. There is no `/invite/accept` page in the frontend, although the invitation email links to it.
+  2. Accepting needs a signed-in account with the invited email (`POST /workspaces/invitations/accept`).
+  3. Every user has a "personal" workspace, and `PrincipalResolver` (`tenancy/context.py`) picks the personal one unless the request carries `X-Workspace-ID`; the frontend never sends that header and has no workspace switcher. The owner's store is itself their personal workspace. So a teammate who signs up and accepts would still land in their own empty workspace.
+  Proposed (waiting for the owner): add the accept page, and make an invited member land in the workspace they were invited to (resolver default, or a remembered choice sent as `X-Workspace-ID` through the API proxies).
+- Not tested: sending an invitation (it emails the invitee), role change and deactivate (the dev workspace has one member).
+
 ## 4. Known gaps worth remembering
 - Routing (`/app/routing`, **not committed yet**): the old lists and the sample-data button are gone; the sample agents, teams, queues and policies were deleted from the dev workspace with the owner's yes. The page is now "who gets what": a topic goes to one real team member, and "everything else" goes to a person, to whoever has the fewest open conversations, or stays unassigned. Rules are stored as `cs_routing_policies` rows with `meta.source = "assignment_rules"` (`services/assignment_rules.py`, `GET` / `PUT /studio/assignment-rules`) and applied in `_analyze_conversation` (`channels.py`) right after the topic is detected, only when the ticket has no assignee. Verified: with "Order status → Mehdi", an order-status chat was assigned and a general question stayed unassigned. The Inbox assignee menu now lists real workspace members (`CaseHeader.tsx`), not `cs_agents`. The older routing engine, teams, queues and agents tables are untouched and unused by this screen. Dev workspace has one rule saved: Order status → the owner.
 - The job worker is now run with auto-reload in development (confirmed 2026-10-01: it restarted itself after a runtime code change).
