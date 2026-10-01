@@ -205,7 +205,7 @@ async def get_widget_settings(
 async def update_widget_settings(
     payload: ChatWidgetSettingsUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.settings.manage")),
 ):
     service = build_service(db)
 

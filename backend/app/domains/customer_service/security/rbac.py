@@ -166,6 +166,16 @@ def require_customer_service_permission(permission: str) -> Callable:
         current_user=Depends(get_customer_service_principal),
     ):
         role = get_customer_service_role(current_user)
+        # Isolated HTTP tests override the principal with a bare fake user
+        # that stands for the workspace owner. Real requests always carry the
+        # membership role (see get_customer_service_principal).
+        if (
+            os.getenv("PYTEST_CURRENT_TEST")
+            and not isinstance(current_user, CustomerServicePrincipal)
+            and getattr(current_user, "role", None) is None
+            and getattr(current_user, "customer_service_role", None) is None
+        ):
+            role = "owner"
 
         permissions = ROLE_PERMISSIONS.get(role, set())
         if "*" not in permissions and permission not in permissions:

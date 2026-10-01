@@ -16,6 +16,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   badge?: "approvals" | "waiting";
+  // The lowest role that can use this screen; everyone when left out.
+  minRole?: "manager" | "admin";
 };
 
 export type NavGroup = {
@@ -42,16 +44,16 @@ export const primaryNav: NavGroup[] = [
   {
     label: "Improve",
     items: [
-      { href: "/app/workflows", label: "Automations", icon: Workflow },
+      { href: "/app/workflows", label: "Automations", icon: Workflow, minRole: "manager" },
       { href: "/app/knowledge", label: "Knowledge", icon: BookOpen },
-      { href: "/app/routing", label: "Routing & teams", icon: Route },
+      { href: "/app/routing", label: "Routing", icon: Route, minRole: "manager" },
     ],
   },
 ];
 
 export const configurationNav: NavItem[] = [
   { href: "/app/settings", label: "Settings", icon: Settings },
-  { href: "/app/billing", label: "Billing", icon: CreditCard },
+  { href: "/app/billing", label: "Billing", icon: CreditCard, minRole: "admin" },
 ];
 
 export function isActivePath(pathname: string, href: string) {

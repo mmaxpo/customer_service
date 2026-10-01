@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { roleAtLeast, useWorkspaceRole } from "@/domains/workspace/useWorkspaceRole";
 import { cn } from "@/platform/utils";
 
 import { isActivePath, primaryNav } from "./navigation";
@@ -14,14 +15,16 @@ const mobileItems = primaryNav
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const role = useWorkspaceRole();
+  const items = mobileItems.filter((item) => roleAtLeast(role, item.minRole));
 
   return (
     <nav
       aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      <div className="mx-auto grid h-16 max-w-lg grid-cols-5">
-        {mobileItems.map((item) => {
+      <div className="mx-auto flex h-16 max-w-lg">
+        {items.map((item) => {
           const Icon = item.icon;
           const active = isActivePath(pathname, item.href);
 
@@ -31,7 +34,7 @@ export default function MobileNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 text-[11px] font-medium",
+                "flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus",
                 active ? "text-primary" : "text-text-secondary",
               )}

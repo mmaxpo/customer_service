@@ -300,7 +300,7 @@ queues_router = APIRouter(tags=["Customer Service Queues"])
 async def create_queue(
     payload: QueueCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.routing.manage")),
 ):
     return await CustomerServiceQueueService(db).create(
         user_id=current_user.id, payload=payload
@@ -335,7 +335,7 @@ async def update_queue(
     queue_id: UUID,
     payload: QueueUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.routing.manage")),
 ):
     return await CustomerServiceQueueService(db).update(
         user_id=current_user.id,
@@ -348,7 +348,7 @@ async def update_queue(
 async def delete_queue(
     queue_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.routing.manage")),
 ):
     await CustomerServiceQueueService(db).delete(
         user_id=current_user.id, queue_id=queue_id

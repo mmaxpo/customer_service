@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 
 import { useApprovals } from "@/domains/customer-service/inbox/features/approvals/hooks";
 import { useWaitingForPerson } from "@/domains/customer-service/live/useWaitingForPerson";
+import { roleAtLeast, useWorkspaceRole } from "@/domains/workspace/useWorkspaceRole";
 import { authApi } from "@/platform/api";
 import { TajeranMark } from "@/ui/brand/TajeranMark";
 import { cn } from "@/platform/utils";
@@ -49,6 +50,7 @@ function RailLink({ item, count, compact = false }: { item: NavItem; count?: num
 export default function AppRail() {
   const { waits } = useApprovals();
   const waiting = useWaitingForPerson();
+  const role = useWorkspaceRole();
 
   return (
     <nav
@@ -67,7 +69,7 @@ export default function AppRail() {
           <section key={group.label} aria-labelledby={`nav-${group.label}`} className="flex flex-col gap-0.5">
             {index > 0 ? <div className="mx-2 mb-2 border-t border-border" aria-hidden /> : null}
             <h2 id={`nav-${group.label}`} className="sr-only">{group.label}</h2>
-            {group.items.map((item) => (
+            {group.items.filter((item) => roleAtLeast(role, item.minRole)).map((item) => (
               <RailLink
                 key={item.href}
                 item={item}
@@ -79,7 +81,7 @@ export default function AppRail() {
       </div>
 
       <section aria-label="Configuration" className="mt-3 flex w-full flex-col gap-0.5 border-t border-border pt-3">
-        {configurationNav.map((item) => (
+        {configurationNav.filter((item) => roleAtLeast(role, item.minRole)).map((item) => (
           <RailLink key={item.href} item={item} compact />
         ))}
         <button

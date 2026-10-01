@@ -75,6 +75,9 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
         try {
             const detail = JSON.parse(err.body)?.detail;
             if (typeof detail === "string" && detail.trim()) return detail;
+            // Some endpoints answer with { code, message }.
+            const message = typeof detail?.message === "string" ? detail.message.trim() : "";
+            if (message) return message.charAt(0).toUpperCase() + message.slice(1) + (/[.!?]$/.test(message) ? "" : ".");
         } catch {
             // Non-JSON error body; fall through to the fallback.
         }

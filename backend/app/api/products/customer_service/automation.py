@@ -126,7 +126,7 @@ workflow_templates_router = APIRouter(tags=["Customer Service Workflow Templates
 async def create_template(
     payload: WorkflowTemplateCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
 
     return await WorkflowTemplateService(db).create(current_user.id, payload)
@@ -146,7 +146,7 @@ async def list_templates(
     "/workflow-templates/seed-shopify", response_model=SeedWorkflowTemplatesRead
 )
 async def seed_shopify_templates(
-    db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)
+    db: AsyncSession = Depends(get_db), current_user=Depends(require_customer_service_permission("cs.automation.manage"))
 ):
 
     return await WorkflowTemplateService(db).seed_shopify_system_templates()
@@ -159,7 +159,7 @@ async def clone_template(
     template_id,
     payload: WorkflowTemplateCloneRequest,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
 
     return await WorkflowTemplateService(db).clone(
@@ -174,7 +174,7 @@ async def update_template(
     template_id,
     payload: WorkflowTemplateUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
 
     return await WorkflowTemplateService(db).update(
@@ -188,7 +188,7 @@ async def update_template(
 async def publish_template(
     template_id,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
 
     return await WorkflowTemplateService(db).publish(
@@ -202,7 +202,7 @@ async def publish_template(
 async def unpublish_template(
     template_id,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
 
     return await WorkflowTemplateService(db).unpublish(
@@ -216,7 +216,7 @@ async def unpublish_template(
 )
 async def seed_website_chat_workflow_templates(
     db=Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await WorkflowTemplateService(db).seed_website_chat_system_templates()
 
@@ -435,7 +435,7 @@ event_subscriptions_router = APIRouter(tags=["Customer Service Event Subscriptio
 async def create_event_subscription(
     payload: EventSubscriptionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await CustomerServiceEventSubscriptionService(db).create(
         user_id=current_user.id,
@@ -479,7 +479,7 @@ async def update_event_subscription(
     subscription_id: UUID,
     payload: EventSubscriptionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await CustomerServiceEventSubscriptionService(db).update(
         user_id=current_user.id,
@@ -495,7 +495,7 @@ async def update_event_subscription(
 async def delete_event_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     await CustomerServiceEventSubscriptionService(db).delete(
         user_id=current_user.id,
@@ -510,7 +510,7 @@ async def delete_event_subscription(
 )
 async def seed_shopify_event_subscriptions(
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await CustomerServiceEventSubscriptionService(
         db
@@ -526,7 +526,7 @@ async def seed_shopify_event_subscriptions(
 async def enable_event_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await CustomerServiceEventSubscriptionService(db).set_active(
         user_id=current_user.id,
@@ -542,7 +542,7 @@ async def enable_event_subscription(
 async def disable_event_subscription(
     subscription_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
     return await CustomerServiceEventSubscriptionService(db).set_active(
         user_id=current_user.id,
