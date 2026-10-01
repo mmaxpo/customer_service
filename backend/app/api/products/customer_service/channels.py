@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import SessionLocal, get_db
+from app.domains.customer_service.services.assignment_rules import AssignmentRulesService
 from app.domains.customer_service.services.customer_feedback import CustomerFeedbackService
 from app.domains.customer_service.integrations.omnichannel.providers import (
     register_default_omnichannel_providers,
@@ -320,6 +321,11 @@ async def _analyze_conversation(user_id: UUID, conversation_id: UUID) -> None:
         async with SessionLocal() as db:
             await ConversationIntelligenceService(db).analyze(
                 user_id=user_id, conversation_id=conversation_id
+            )
+            # The topic is known now: give the conversation to a team member
+            # if the routing rules say so.
+            await AssignmentRulesService(db).assign(
+                workspace_id=user_id, conversation_id=conversation_id
             )
     except Exception:
         logging.getLogger(__name__).exception(

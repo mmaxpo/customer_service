@@ -9,6 +9,7 @@ from app.core.session import get_db
 from app.domains.customer_service.security.rbac import (
     require_customer_service_permission,
 )
+from app.domains.customer_service.services.assignment_rules import AssignmentRulesService
 from app.domains.customer_service.services.automation_studio import (
     AutomationStudioService,
 )
@@ -203,6 +204,37 @@ async def delete_workflow(
 ):
     await AutomationStudioService(db).delete_workflow(
         workspace_id=current_user.id, subscription_id=workflow_id
+    )
+
+
+class TopicRule(BaseModel):
+    topic: str = Field(min_length=1, max_length=100)
+    assignee: str = Field(min_length=1, max_length=64)
+
+
+class AssignmentRules(BaseModel):
+    topics: list[TopicRule] = Field(default_factory=list, max_length=20)
+    default: str | None = Field(default=None, max_length=64)
+
+
+@studio_router.get("/assignment-rules")
+async def assignment_rules(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await AssignmentRulesService(db).rules(workspace_id=current_user.id)
+
+
+@studio_router.put("/assignment-rules")
+async def save_assignment_rules(
+    payload: AssignmentRules,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AssignmentRulesService(db).save(
+        workspace_id=current_user.id,
+        topics=[rule.model_dump() for rule in payload.topics],
+        default=payload.default,
     )
 
 
