@@ -19,6 +19,26 @@ from app.platform.jobs.recovery import JobRecoveryService
 from app.platform.jobs.replay import JobReplayService
 from app.platform.jobs.schemas import JobCreate, JobRead
 from app.platform.jobs.service import JobService
+from app.platform.schedules.scheduler import WorkflowScheduler
+from app.platform.schedules.schemas import WorkflowScheduleCreate, WorkflowScheduleRead
+from app.platform.schedules.service import WorkflowScheduleService
+from fastapi import Request
+from app.platform.webhooks.schemas import (
+    WebhookDeliveryRead,
+    WebhookEndpointCreate,
+    WebhookEndpointRead,
+)
+from app.platform.webhooks.service import WebhookService
+from app.platform.events.event_store import PlatformEventStore
+from app.platform.events.publisher import PlatformEventPublisher
+from app.platform.events.schemas import PlatformEventCreate, PlatformEventRead
+from contextlib import suppress
+from fastapi import Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
+from app.tenancy.context import PrincipalResolver
+from app.platform.realtime.codec import encode_sse_event, encode_sse_heartbeat
+from app.platform.realtime.hub import realtime_hub
+from app.platform.realtime.presence import PresenceLease
 
 jobs_router = APIRouter(
     prefix="/jobs",
@@ -139,16 +159,8 @@ async def get_job(
 # app/schedules/router.py
 # ============================================================
 
-from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user
-from app.core.session import get_db
-from app.platform.schedules.scheduler import WorkflowScheduler
-from app.platform.schedules.schemas import WorkflowScheduleCreate, WorkflowScheduleRead
-from app.platform.schedules.service import WorkflowScheduleService
 
 schedules_router = APIRouter(
     prefix="/schedules",
@@ -216,19 +228,8 @@ async def tick_schedules(
 # app/webhooks/router.py
 # ============================================================
 
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user
-from app.core.session import get_db
-from app.platform.webhooks.schemas import (
-    WebhookDeliveryRead,
-    WebhookEndpointCreate,
-    WebhookEndpointRead,
-)
-from app.platform.webhooks.service import WebhookService
 
 webhooks_router = APIRouter(
     prefix="/webhooks",
@@ -284,16 +285,8 @@ async def receive_webhook(
 # app/platform/events/router.py
 # ============================================================
 
-from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user
-from app.core.session import get_db
-from app.platform.events.event_store import PlatformEventStore
-from app.platform.events.publisher import PlatformEventPublisher
-from app.platform.events.schemas import PlatformEventCreate, PlatformEventRead
 
 events_router = APIRouter(
     prefix="/events",
@@ -350,20 +343,8 @@ async def get_event(
 # app/realtime/router.py
 # ============================================================
 
-import asyncio
-from contextlib import suppress
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
 
-from app.api.auth import get_current_user
-from app.core.session import get_db
-from app.tenancy.context import PrincipalResolver
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.platform.realtime.codec import encode_sse_event, encode_sse_heartbeat
-from app.platform.realtime.hub import realtime_hub
-from app.platform.realtime.presence import PresenceLease
 
 realtime_router = APIRouter(prefix="/realtime", tags=["Realtime"])
 

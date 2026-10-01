@@ -4,7 +4,6 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
-    and_,
     func,
     or_,
     select,

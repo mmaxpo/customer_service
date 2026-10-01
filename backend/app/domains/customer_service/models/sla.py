@@ -9,25 +9,16 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     String,
-    Text,
     func,
     Integer,
-    Boolean,
-    Float,
-    UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.domains.customer_service.models.enums import (
-    CustomerStatus,
     SLAViolationStatus,
-    TicketStatus,
     TicketPriority,
     SLATargetType,
-    AgentAssistSuggestionStatus,
-    MessageSenderType,
-    ConversationStatus,
 )
 from app.models.models import Base
 

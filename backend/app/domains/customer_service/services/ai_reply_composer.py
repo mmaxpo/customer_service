@@ -13,7 +13,6 @@ class CustomerServiceAIReplyComposer:
             "order_id"
         )
         financial_status = shopify_context.get("financial_status")
-        fulfillment_status = shopify_context.get("fulfillment_status")
         total_price = shopify_context.get("total_price")
         currency = shopify_context.get("currency")
         tracking = shopify_context.get("tracking") or {}

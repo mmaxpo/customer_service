@@ -1,4 +1,18 @@
 from __future__ import annotations
+from dataclasses import dataclass, field
+from app.runtime.capabilities.registry.contracts import (
+    CapabilityCategory,
+    CapabilityDefinition,
+    CapabilityDomain,
+)
+from app.runtime.capabilities.registry.contracts import (
+    CapabilityProvider,
+    CapabilityProviderKind,
+)
+from app.runtime.capabilities.registry.contracts import ProviderBinding
+from app.runtime.capabilities.registry.compatibility.aliases import (
+    CapabilityAliasRegistry,
+)
 
 """
 Canonical registry implementations for the capability system.
@@ -6,13 +20,7 @@ Canonical registry implementations for the capability system.
 Historical registry module paths remain as compatibility shims.
 """
 
-from dataclasses import dataclass, field
 
-from app.runtime.capabilities.registry.contracts import (
-    CapabilityCategory,
-    CapabilityDefinition,
-    CapabilityDomain,
-)
 
 
 @dataclass
@@ -85,12 +93,7 @@ class CapabilityRegistry:
         ]
 
 
-from dataclasses import dataclass, field
 
-from app.runtime.capabilities.registry.contracts import (
-    CapabilityProvider,
-    CapabilityProviderKind,
-)
 
 
 @dataclass
@@ -119,9 +122,7 @@ class ProviderRegistry:
         ]
 
 
-from dataclasses import dataclass, field
 
-from app.runtime.capabilities.registry.contracts import ProviderBinding
 
 
 @dataclass
@@ -186,9 +187,6 @@ class BindingRegistry:
             key=lambda b: (-b.priority, b.provider_id),
         )
 
-from app.runtime.capabilities.registry.compatibility.aliases import (
-    CapabilityAliasRegistry,
-)
 
 
 __all__ = [

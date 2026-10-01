@@ -41,6 +41,26 @@ from app.runtime.learning import (
     BusinessLearningTrendReport,
     BusinessLearningTrendService,
 )
+from app.domains.customer_service.services.dashboard import (
+    CustomerServiceDashboardService,
+)
+from app.domains.customer_service.schemas.reply_quality_insights import (
+    ReplyQualityInsightsRead,
+)
+from app.domains.customer_service.services.reply_quality_insights import (
+    ReplyQualityInsightsService,
+)
+from app.domains.customer_service.schemas.reply_quality_dashboard import (
+    ReplyQualityDashboardRead,
+)
+from app.domains.customer_service.services.reply_quality_dashboard import (
+    ReplyQualityDashboardService,
+)
+from app.domains.customer_service.services.reply_quality_trends import (
+    ReplyQualityTrendsService,
+)
+from app.domains.customer_service.schemas.audit_logs import AuditLogRead
+from app.domains.customer_service.services.audit_logs import AuditLogService
 
 analytics_router = APIRouter(
     tags=["Customer Service - Analytics"],
@@ -389,15 +409,7 @@ async def get_business_learning_approved_insight(
 # Legacy HTTP source: app/domains/customer_service/routers/dashboard.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.dashboard import (
-    CustomerServiceDashboardService,
-)
 
 dashboard_router = APIRouter(tags=["Customer Service - Dashboard"])
 
@@ -416,18 +428,7 @@ async def get_dashboard_aggregates(
 # Legacy HTTP source: app/domains/customer_service/routers/reply_quality_insights.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.reply_quality_insights import (
-    ReplyQualityInsightsRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.reply_quality_insights import (
-    ReplyQualityInsightsService,
-)
 
 reply_quality_insights_router = APIRouter(
     tags=["Customer Service - Reply Quality Insights"]
@@ -451,18 +452,7 @@ async def reply_quality_insights(
 # Legacy HTTP source: app/domains/customer_service/routers/reply_quality_dashboard.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.reply_quality_dashboard import (
-    ReplyQualityDashboardRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.reply_quality_dashboard import (
-    ReplyQualityDashboardService,
-)
 
 reply_quality_dashboard_router = APIRouter(
     tags=["Customer Service - Reply Quality Dashboard"]
@@ -484,15 +474,7 @@ async def reply_quality_dashboard(
 # Legacy HTTP source: app/domains/customer_service/routers/reply_quality_trends.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.reply_quality_trends import (
-    ReplyQualityTrendsService,
-)
 
 reply_quality_trends_router = APIRouter(
     tags=["Customer Service - Reply Quality Trends"]
@@ -513,14 +495,7 @@ async def reply_quality_trends(
 # Legacy HTTP source: app/domains/customer_service/routers/audit_logs.py
 # ============================================================
 
-from fastapi import APIRouter, Depends, Query
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.audit_logs import AuditLogRead
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.audit_logs import AuditLogService
 
 audit_logs_router = APIRouter(
     prefix="/audit-logs", tags=["Customer Service - Audit Logs"]

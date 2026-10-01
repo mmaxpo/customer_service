@@ -17,9 +17,6 @@ from app.domains.customer_service.schemas.agents import (
 )
 from app.domains.customer_service.security.rbac import (
     get_customer_service_principal as get_current_user,
-    get_customer_service_principal,
-)
-from app.domains.customer_service.security.rbac import (
     require_customer_service_permission,
 )
 from app.domains.customer_service.services.workforce.agents import (
@@ -27,6 +24,37 @@ from app.domains.customer_service.services.workforce.agents import (
 )
 from app.domains.customer_service.services.workforce.time_off import AgentTimeOffService
 from app.domains.customer_service.realtime.publisher import CustomerServiceRealtimePublisher
+from app.domains.customer_service.schemas.teams import (
+    TeamCreate,
+    TeamDetail,
+    TeamMemberAdd,
+    TeamMemberRead,
+    TeamRead,
+    TeamUpdate,
+)
+from app.domains.customer_service.services.workforce.teams import (
+    CustomerServiceTeamService,
+)
+from app.domains.customer_service.schemas.queues import (
+    QueueCreate,
+    QueueRead,
+    QueueUpdate,
+)
+from app.domains.customer_service.services.workforce.queues import CustomerServiceQueueService
+from app.domains.customer_service.schemas.routing_policies import (
+    RoutingPolicyCreate,
+    RoutingPolicyRead,
+    RoutingPolicyUpdate,
+)
+from app.domains.customer_service.services.routing_policies import (
+    CustomerServiceRoutingPolicyService,
+)
+from app.domains.customer_service.schemas.sla import (
+    SLAPolicyCreate,
+    SLAPolicyRead,
+    SLAViolationRead,
+)
+from app.domains.customer_service.services.sla import SLAService
 
 agents_router = APIRouter(tags=["Customer Service Agents"])
 
@@ -162,23 +190,7 @@ async def delete_agent(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends, Query, status
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.teams import (
-    TeamCreate,
-    TeamDetail,
-    TeamMemberAdd,
-    TeamMemberRead,
-    TeamRead,
-    TeamUpdate,
-)
-from app.domains.customer_service.security.rbac import (
-    require_customer_service_permission,
-)
-from app.domains.customer_service.services.workforce.teams import (
-    CustomerServiceTeamService,
-)
 
 teams_router = APIRouter(tags=["Customer Service Teams"])
 
@@ -283,15 +295,7 @@ async def remove_team_member(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends, status
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.queues import (
-    QueueCreate,
-    QueueRead,
-    QueueUpdate,
-)
-from app.domains.customer_service.services.workforce.queues import CustomerServiceQueueService
 
 queues_router = APIRouter(tags=["Customer Service Queues"])
 
@@ -361,23 +365,7 @@ async def delete_queue(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends, Query, status
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.routing_policies import (
-    RoutingPolicyCreate,
-    RoutingPolicyRead,
-    RoutingPolicyUpdate,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.security.rbac import (
-    require_customer_service_permission,
-)
-from app.domains.customer_service.services.routing_policies import (
-    CustomerServiceRoutingPolicyService,
-)
 
 routing_policies_router = APIRouter(tags=["Customer Service Routing Policies"])
 
@@ -458,21 +446,7 @@ async def delete_routing_policy(
 # Legacy HTTP source: app/domains/customer_service/routers/sla.py
 # ============================================================
 
-from fastapi import APIRouter, Depends, Query
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.sla import (
-    SLAPolicyCreate,
-    SLAPolicyRead,
-    SLAViolationRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.security.rbac import (
-    require_customer_service_permission,
-)
-from app.domains.customer_service.services.sla import SLAService
 
 sla_router = APIRouter(
     prefix="/sla",

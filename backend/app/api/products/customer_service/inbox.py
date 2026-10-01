@@ -22,6 +22,21 @@ from app.domains.customer_service.security.rbac import (
 )
 from app.domains.customer_service.services.inbox import InboxService
 from app.domains.customer_service.services.messaging import CustomerServiceMessagingService
+from uuid import UUID
+from fastapi import HTTPException
+from app.domains.customer_service.repositories.tickets import TicketRepository
+from app.domains.customer_service.schemas.routing import (
+    AutoAssignRequest,
+    AutoAssignResult,
+)
+from app.domains.customer_service.schemas.tickets import TicketRead, TicketUpdate
+from app.domains.customer_service.services.assignment import AssignmentService
+from app.domains.customer_service.services.routing import CustomerServiceRoutingService
+from app.domains.customer_service.schemas.shipping import (
+    ShippingTrackingRead,
+    ShippingTrackRequest,
+)
+from app.domains.customer_service.services.shipping import ShippingService
 
 inbox_router = APIRouter(tags=["Customer Service - Inbox"])
 
@@ -76,22 +91,8 @@ async def ingest_resend_email_webhook(
 # Legacy HTTP source: app/domains/customer_service/routers/tickets.py
 # ============================================================
 
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.session import get_db
-from app.domains.customer_service.repositories.tickets import TicketRepository
-from app.domains.customer_service.schemas.routing import (
-    AutoAssignRequest,
-    AutoAssignResult,
-)
-from app.domains.customer_service.schemas.tickets import TicketRead, TicketUpdate
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.assignment import AssignmentService
-from app.domains.customer_service.services.routing import CustomerServiceRoutingService
 
 tickets_router = APIRouter(tags=["Customer Service - Tickets"])
 
@@ -222,17 +223,7 @@ async def auto_assign_ticket(
 # Legacy HTTP source: app/domains/customer_service/routers/shipping.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.shipping import (
-    ShippingTrackingRead,
-    ShippingTrackRequest,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.shipping import ShippingService
 
 shipping_router = APIRouter(tags=["Customer Service - Shipping"])
 

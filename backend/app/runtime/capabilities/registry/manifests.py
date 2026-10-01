@@ -1,4 +1,10 @@
 from __future__ import annotations
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from app.runtime.capabilities.registry.registries import BindingRegistry
+from app.runtime.capabilities.registry.registries import CapabilityRegistry
+from app.runtime.capabilities.registry.registries import CapabilityAliasRegistry
+from app.runtime.capabilities.registry.registries import ProviderRegistry
 
 """
 Canonical provider-manifest loading implementation.
@@ -8,13 +14,7 @@ bindings, and compatibility aliases through this loader. The historical
 manifest_loader.py path remains a compatibility shim.
 """
 
-from collections.abc import Callable
-from dataclasses import dataclass, field
 
-from app.runtime.capabilities.registry.registries import BindingRegistry
-from app.runtime.capabilities.registry.registries import CapabilityRegistry
-from app.runtime.capabilities.registry.registries import CapabilityAliasRegistry
-from app.runtime.capabilities.registry.registries import ProviderRegistry
 
 ManifestRegisterFn = Callable[..., None]
 

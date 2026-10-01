@@ -15,13 +15,7 @@ from app.runtime.capabilities.registry.registries import (
     CapabilityRegistry,
     ProviderRegistry,
 )
-from app.runtime.capabilities.registry.state import (
-    ProviderAuthRegistry,
-    ProviderHealthRegistry,
-    TenantProviderRegistry,
-)
 from app.runtime.capabilities.registry.system import (
-    CapabilitySystem,
     build_default_system,
 )
 

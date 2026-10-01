@@ -4,15 +4,11 @@ from typing import Any
 from fastapi import HTTPException
 from app.integrations.errors import IntegrationError
 from app.runtime.capabilities.execution import (
-    CapabilityExecutionContext,
     CapabilityExecutorRegistry,
-    CapabilityOutcomeReporter,
-    CapabilityRuntimePolicy,
     CapabilityRuntimePolicyReader,
     CapabilityRuntimePolicySnapshot,
     DatabaseProviderPerformanceScorer,
     DeterministicProviderTrafficAllocator,
-    NullCapabilityOutcomeReporter,
     NullCapabilityRuntimePolicyReader,
     NullProviderHealthReader,
     NullProviderHealthProbeCoordinator,
@@ -27,7 +23,6 @@ from app.runtime.capabilities.execution import (
     ProviderTrafficAllocator,
     ProviderHealthEnforcementMode,
     ProviderHealthReader,
-    build_capability_execution_outcome,
     normalize_provider_health_enforcement_mode,
     build_default_executor_registry,
     classify_integration_failure,
@@ -50,7 +45,6 @@ from app.runtime.capabilities.models import (
 from app.runtime.capabilities.registry import (
     CapabilityResolutionRequest,
     CapabilityResolutionResult,
-    CapabilityRisk,
     CapabilitySystem,
     RejectedProvider,
     build_default_system,

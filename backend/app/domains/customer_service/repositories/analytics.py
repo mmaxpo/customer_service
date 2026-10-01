@@ -5,7 +5,6 @@ from app.domains.customer_service.models import (
     Customer,
     Conversation,
     Ticket,
-    TicketAssignment,
     SLAViolation,
     SLAViolationStatus,
     CustomerServiceQueue,

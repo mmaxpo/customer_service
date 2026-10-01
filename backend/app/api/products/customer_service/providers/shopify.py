@@ -22,7 +22,6 @@ from app.domains.customer_service.integrations.shopify.lifecycle import (
     verify_webhook_hmac,
 )
 from app.domains.customer_service.integrations.shopify.oauth import ShopifyOAuthService
-from app.domains.customer_service.integrations.shopify.webhooks import ShopifyWebhookAdapter
 from app.domains.customer_service.schemas.shopify import (
     ShopifyActionRead,
     ShopifyActionRequest,

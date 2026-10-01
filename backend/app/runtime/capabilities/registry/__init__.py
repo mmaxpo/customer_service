@@ -1,12 +1,4 @@
 from __future__ import annotations
-
-"""
-Stable public API for the Tajeran semantic capability system.
-
-Legacy V2 and former runtime-registry APIs are intentionally available only
-from app.runtime.capabilities.registry.compatibility.
-"""
-
 from app.runtime.capabilities.registry.contracts import (
     CapabilityCategory,
     CapabilityDefinition,
@@ -46,6 +38,14 @@ from app.runtime.capabilities.registry.state import (
 from app.runtime.capabilities.registry.system import (
     CapabilitySystem,
 )
+
+"""
+Stable public API for the Tajeran semantic capability system.
+
+Legacy V2 and former runtime-registry APIs are intentionally available only
+from app.runtime.capabilities.registry.compatibility.
+"""
+
 
 
 __all__ = [

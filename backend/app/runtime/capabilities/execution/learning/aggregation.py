@@ -4,7 +4,6 @@ from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from enum import StrEnum
-from math import sqrt
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-
-_URL_RE = re.compile(r"https?://[^\s]+")
 from pydantic import BaseModel, ConfigDict, Field
-
 from app.tcos.planner.runtime.intent import PlannerIntent
 from app.tcos.planner.runtime.planning_context import PlanningContext
+
+_URL_RE = re.compile(r"https?://[^\s]+")
+
 
 
 class CapabilityReasoningResult(BaseModel):

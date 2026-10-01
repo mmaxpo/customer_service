@@ -19,6 +19,47 @@ from app.domains.customer_service.security.rbac import (
 from app.domains.customer_service.services.conversation_intelligence import (
     ConversationIntelligenceService,
 )
+from app.domains.customer_service.schemas.conversation_intelligence_snapshot import (
+    ConversationIntelligenceSnapshotRead,
+)
+from app.domains.customer_service.services.conversation_intelligence_snapshot import (
+    ConversationIntelligenceSnapshotService,
+)
+from app.domains.customer_service.schemas.suggested_actions import (
+    ExecuteSuggestedActionRequest,
+    SuggestedActionRead,
+)
+from app.domains.customer_service.services.suggested_actions import (
+    SuggestedActionService,
+)
+from app.domains.customer_service.schemas.reply_quality import (
+    ReplyQualityAnalyticsRead,
+    ReplyQualityCreate,
+    ReplyQualityRead,
+)
+from app.domains.customer_service.services.reply_quality import ReplyQualityService
+from app.domains.customer_service.schemas.quality_reviews import QualityReviewRead
+from app.domains.customer_service.services.quality_reviews import QualityReviewService
+from app.domains.customer_service.repositories.conversations import (
+    ConversationRepository,
+)
+from app.domains.customer_service.schemas.ai_replies import (
+    AIReplyComposeRead,
+    AIReplyComposeRequest,
+)
+from app.domains.customer_service.schemas.ai_reply_regenerate import (
+    AIReplyRegenerateRead,
+)
+from app.domains.customer_service.schemas.conversation_summary import (
+    ConversationSummaryRead,
+)
+from app.domains.customer_service.services.ai_replies import AIReplyService
+from app.domains.customer_service.services.ai_reply_regeneration import (
+    AIReplyRegenerationService,
+)
+from app.domains.customer_service.services.conversation_summary import (
+    ConversationSummaryService,
+)
 
 conversation_intelligence_router = APIRouter(
     tags=["Customer Service - Conversation Intelligence"]
@@ -69,18 +110,7 @@ async def list_conversation_insights(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.conversation_intelligence_snapshot import (
-    ConversationIntelligenceSnapshotRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.conversation_intelligence_snapshot import (
-    ConversationIntelligenceSnapshotService,
-)
 
 conversation_intelligence_snapshot_router = APIRouter(
     tags=["Customer Service - Conversation Intelligence Snapshot"]
@@ -107,19 +137,7 @@ async def get_conversation_intelligence_snapshot(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.suggested_actions import (
-    ExecuteSuggestedActionRequest,
-    SuggestedActionRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.suggested_actions import (
-    SuggestedActionService,
-)
 
 suggested_actions_router = APIRouter(tags=["Customer Service - Suggested Actions"])
 
@@ -206,18 +224,7 @@ async def execute_action(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.reply_quality import (
-    ReplyQualityAnalyticsRead,
-    ReplyQualityCreate,
-    ReplyQualityRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.reply_quality import ReplyQualityService
 
 reply_quality_router = APIRouter(tags=["Customer Service - Reply Quality"])
 
@@ -278,14 +285,7 @@ async def reply_quality_analytics(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.quality_reviews import QualityReviewRead
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.quality_reviews import QualityReviewService
 
 quality_reviews_router = APIRouter(tags=["Customer Service Quality Reviews"])
 
@@ -324,32 +324,7 @@ async def list_reviews(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.repositories.conversations import (
-    ConversationRepository,
-)
-from app.domains.customer_service.schemas.ai_replies import (
-    AIReplyComposeRead,
-    AIReplyComposeRequest,
-)
-from app.domains.customer_service.schemas.ai_reply_regenerate import (
-    AIReplyRegenerateRead,
-)
-from app.domains.customer_service.schemas.conversation_summary import (
-    ConversationSummaryRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.ai_replies import AIReplyService
-from app.domains.customer_service.services.ai_reply_regeneration import (
-    AIReplyRegenerationService,
-)
-from app.domains.customer_service.services.conversation_summary import (
-    ConversationSummaryService,
-)
 
 ai_replies_router = APIRouter(tags=["Customer Service - AI Replies"])
 

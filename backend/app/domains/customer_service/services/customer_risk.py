@@ -9,7 +9,6 @@ from app.domains.customer_service.models import (
     ConversationTag,
     Ticket,
     TicketPriority,
-    TicketStatus,
     SLAViolation,
 )
 

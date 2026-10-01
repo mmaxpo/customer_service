@@ -1,4 +1,9 @@
 from __future__ import annotations
+from dataclasses import dataclass, field
+from app.runtime.capabilities.registry.compatibility.v2_models import (
+    CapabilityCategory,
+    CapabilityDefinition,
+)
 
 """
 Canonical legacy V2 capability registry.
@@ -6,12 +11,7 @@ Canonical legacy V2 capability registry.
 Current semantic capability code must use capability_registry.registries.
 """
 
-from dataclasses import dataclass, field
 
-from app.runtime.capabilities.registry.compatibility.v2_models import (
-    CapabilityCategory,
-    CapabilityDefinition,
-)
 
 
 @dataclass

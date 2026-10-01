@@ -46,6 +46,29 @@ from app.domains.customer_service.services.internal_notes import InternalNoteSer
 from app.domains.customer_service.services.triage import (
     AutoTriageService,
 )
+from app.domains.customer_service.schemas.tags import (
+    ConversationTagCreate,
+    ConversationTagRead,
+)
+from app.domains.customer_service.services.tags import ConversationTagService
+from app.domains.customer_service.schemas.timeline import (
+    ConversationTimelineEventRead,
+)
+from app.domains.customer_service.services.timeline import (
+    ConversationTimelineService,
+)
+from app.domains.customer_service.schemas.conversation_context import (
+    ConversationContextRead,
+)
+from app.domains.customer_service.services.conversation_context import (
+    ConversationContextService,
+)
+from app.domains.customer_service.schemas.workspace_recommendations import (
+    WorkspaceRecommendationsRead,
+)
+from app.domains.customer_service.services.workspace_recommendations import (
+    WorkspaceRecommendationsService,
+)
 
 conversations_router = APIRouter(tags=["Customer Service - Conversations"])
 
@@ -339,17 +362,7 @@ async def list_agent_assist_suggestion_revisions(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.tags import (
-    ConversationTagCreate,
-    ConversationTagRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.tags import ConversationTagService
 
 tags_router = APIRouter(
     prefix="/conversations/{conversation_id}/tags",
@@ -402,18 +415,7 @@ async def remove_conversation_tag(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends, Query
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.timeline import (
-    ConversationTimelineEventRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.timeline import (
-    ConversationTimelineService,
-)
 
 timeline_router = APIRouter(tags=["Customer Service - Timeline"])
 
@@ -440,18 +442,7 @@ async def get_conversation_timeline(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.conversation_context import (
-    ConversationContextRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.conversation_context import (
-    ConversationContextService,
-)
 
 conversation_context_router = APIRouter(
     tags=["Customer Service - Conversation Context"]
@@ -478,18 +469,7 @@ async def get_conversation_context(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.workspace_recommendations import (
-    WorkspaceRecommendationsRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.workspace_recommendations import (
-    WorkspaceRecommendationsService,
-)
 
 workspace_recommendations_router = APIRouter(
     tags=["Customer Service - Workspace Recommendations"]

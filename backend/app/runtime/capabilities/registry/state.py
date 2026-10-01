@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass, field
 
 """
 Canonical dynamic-state implementations for capability resolution.
@@ -7,7 +8,6 @@ This module owns tenant provider availability, provider authentication state,
 and provider health state. Historical module paths remain compatibility shims.
 """
 
-from dataclasses import dataclass, field
 
 
 @dataclass
@@ -66,7 +66,6 @@ class TenantProviderRegistry:
         )
 
 
-from dataclasses import dataclass, field
 
 
 @dataclass
@@ -101,7 +100,6 @@ class ProviderAuthRegistry:
         return self._auth.get((tenant_id, provider_id), False)
 
 
-from dataclasses import dataclass, field
 
 
 @dataclass

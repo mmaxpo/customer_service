@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.customer_service.services.conversation_intelligence_snapshot import (

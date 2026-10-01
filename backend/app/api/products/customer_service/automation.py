@@ -4,24 +4,9 @@ from __future__ import annotations
 # Legacy HTTP source: app/domains/customer_service/routers/workflows.py
 # ============================================================
 from fastapi import APIRouter
-
-workflows_router = APIRouter(tags=["Customer Service - Workflows"])
-
-
-@workflows_router.get("/")
-async def get_workflows():
-    return {"workflows": []}
-
-
-# ============================================================
-# Legacy HTTP source: app/domains/customer_service/routers/macros.py
-# ============================================================
-
 from uuid import UUID
-
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.session import get_db
 from app.domains.customer_service.schemas.conversations import ConversationMessageRead
 from app.domains.customer_service.schemas.macros import (
@@ -38,6 +23,48 @@ from app.domains.customer_service.security.rbac import (
 from app.workflow_operations.snapshots.schemas import WorkflowRunSnapshotRead
 from app.workflow_operations.waits.schemas import WorkflowWaitRead
 from app.domains.customer_service.services.macros import MacroService
+from app.domains.customer_service.schemas.workflow_templates import (
+    SeedWorkflowTemplatesRead,
+    WorkflowTemplateCloneRequest,
+    WorkflowTemplateCreate,
+    WorkflowTemplateRead,
+    WorkflowTemplateUpdate,
+)
+from app.domains.customer_service.services.workflow_templates import (
+    WorkflowTemplateService,
+)
+from app.domains.customer_service.schemas.workflow_executions import (
+    CustomerServiceWorkflowExecutionRead,
+    CustomerServiceWorkflowTemplateRunRequest,
+)
+from app.domains.customer_service.services.workflow_executions import (
+    CustomerServiceWorkflowExecutionService,
+)
+from fastapi import Response, status
+from app.domains.customer_service.schemas.event_subscriptions import (
+    EventSubscriptionCreate,
+    EventSubscriptionRead,
+    EventSubscriptionUpdate,
+    SeedEventSubscriptionsRead,
+)
+from app.domains.customer_service.services.event_subscriptions import (
+    CustomerServiceEventSubscriptionService,
+)
+
+workflows_router = APIRouter(tags=["Customer Service - Workflows"])
+
+
+@workflows_router.get("/")
+async def get_workflows():
+    return {"workflows": []}
+
+
+# ============================================================
+# Legacy HTTP source: app/domains/customer_service/routers/macros.py
+# ============================================================
+
+
+
 
 macros_router = APIRouter(prefix="/macros", tags=["Customer Service - Macros"])
 
@@ -100,22 +127,7 @@ async def apply_macro(
 # Legacy HTTP source: app/domains/customer_service/routers/workflow_templates.py
 # ============================================================
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.workflow_templates import (
-    SeedWorkflowTemplatesRead,
-    WorkflowTemplateCloneRequest,
-    WorkflowTemplateCreate,
-    WorkflowTemplateRead,
-    WorkflowTemplateUpdate,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.workflow_templates import (
-    WorkflowTemplateService,
-)
 
 workflow_templates_router = APIRouter(tags=["Customer Service Workflow Templates"])
 
@@ -226,19 +238,7 @@ async def seed_website_chat_workflow_templates(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.workflow_executions import (
-    CustomerServiceWorkflowExecutionRead,
-    CustomerServiceWorkflowTemplateRunRequest,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.workflow_executions import (
-    CustomerServiceWorkflowExecutionService,
-)
 
 workflow_executions_router = APIRouter(tags=["Customer Service Workflow Executions"])
 
@@ -409,21 +409,7 @@ async def replay_customer_service_workflow_snapshot(
 # ============================================================
 
 
-from fastapi import APIRouter, Depends, Response, status
 
-from app.core.session import get_db
-from app.domains.customer_service.schemas.event_subscriptions import (
-    EventSubscriptionCreate,
-    EventSubscriptionRead,
-    EventSubscriptionUpdate,
-    SeedEventSubscriptionsRead,
-)
-from app.domains.customer_service.security.rbac import (
-    get_customer_service_principal as get_current_user,
-)
-from app.domains.customer_service.services.event_subscriptions import (
-    CustomerServiceEventSubscriptionService,
-)
 
 event_subscriptions_router = APIRouter(tags=["Customer Service Event Subscriptions"])
 

@@ -1,4 +1,7 @@
 from __future__ import annotations
+from enum import StrEnum
+from typing import Any
+from pydantic import BaseModel, Field
 
 """
 Canonical legacy V2 capability contracts.
@@ -7,10 +10,7 @@ These contracts remain isolated for runtime backward compatibility. Current
 semantic capability code must use capability_registry.contracts instead.
 """
 
-from enum import StrEnum
-from typing import Any
 
-from pydantic import BaseModel, Field
 
 
 class CapabilityProviderType(StrEnum):

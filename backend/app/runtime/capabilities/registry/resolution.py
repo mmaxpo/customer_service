@@ -1,34 +1,6 @@
 from __future__ import annotations
-
-"""
-Canonical capability-resolution implementation.
-
-This module owns:
-- ResolverPipeline
-- CapabilityResolver
-- the stable resolution public API
-
-Individual policy implementations remain isolated under policies/ because each
-policy has one focused responsibility.
-
-"""
-
 from dataclasses import dataclass, field
-
 from app.runtime.capabilities.registry.policies import ResolverPolicy
-
-
-@dataclass
-class ResolverPipeline:
-    policies: list[ResolverPolicy] = field(default_factory=list)
-
-    def run(self, ctx) -> None:
-        for policy in self.policies:
-            policy.apply(ctx)
-
-
-from dataclasses import dataclass
-
 from app.runtime.capabilities.registry.registries import BindingRegistry
 from app.runtime.capabilities.registry.registries import CapabilityRegistry
 from app.runtime.capabilities.registry.registries import CapabilityAliasRegistry
@@ -51,12 +23,39 @@ from app.runtime.capabilities.registry.policies import (
     RegionPolicy,
     CapabilityConstraintPolicy,
 )
-
 from app.runtime.capabilities.registry.contracts import (
     CapabilityResolutionRequest,
     CapabilityResolutionResult,
     RejectedProvider,
 )
+
+"""
+Canonical capability-resolution implementation.
+
+This module owns:
+- ResolverPipeline
+- CapabilityResolver
+- the stable resolution public API
+
+Individual policy implementations remain isolated under policies/ because each
+policy has one focused responsibility.
+
+"""
+
+
+
+
+@dataclass
+class ResolverPipeline:
+    policies: list[ResolverPolicy] = field(default_factory=list)
+
+    def run(self, ctx) -> None:
+        for policy in self.policies:
+            policy.apply(ctx)
+
+
+
+
 
 def _diagnostics(
     *,
