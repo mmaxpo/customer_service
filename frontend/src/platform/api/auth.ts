@@ -1,4 +1,4 @@
-import { apiJson, jsonBody } from "./client";
+import { apiFetch, apiJson, jsonBody } from "./client";
 
 export const authApi = {
     signup(payload: {
@@ -35,6 +35,16 @@ export const authApi = {
             method: "POST",
             body: jsonBody({ token, new_password }),
         });
+    },
+
+    // Ends the session, then always leaves the app: a failed call must not
+    // strand someone on a screen they believe they have left.
+    async logout() {
+        try {
+            await apiFetch("/api/auth/logout", { method: "POST" });
+        } finally {
+            window.location.href = "/login";
+        }
     },
 
     me() {

@@ -11,6 +11,7 @@ from app.api.platform import (
 )
 from app.api.agents import router as agents_router
 from app.api.auth import router as auth_router
+from app.api.contact import router as contact_router
 from app.api.knowledge import router as knowledge_router
 from app.api.tools import router as tools_router
 from app.api.tcos import router as tcos_router
@@ -33,6 +34,7 @@ api_router = APIRouter()
 
 api_router.include_router(health_router, prefix="/health", tags=["health"])
 api_router.include_router(auth_router)
+api_router.include_router(contact_router)
 api_router.include_router(workflows_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(agents_router)

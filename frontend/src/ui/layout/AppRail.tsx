@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
 
 import { useApprovals } from "@/domains/customer-service/inbox/features/approvals/hooks";
 import { useWaitingForPerson } from "@/domains/customer-service/live/useWaitingForPerson";
+import { authApi } from "@/platform/api";
 import { TajeranMark } from "@/ui/brand/TajeranMark";
 import { cn } from "@/platform/utils";
 
@@ -80,6 +82,15 @@ export default function AppRail() {
         {configurationNav.map((item) => (
           <RailLink key={item.href} item={item} compact />
         ))}
+        <button
+          type="button"
+          onClick={() => void authApi.logout()}
+          title="Log out"
+          className="flex w-full flex-col items-center gap-1 rounded-control px-1 py-2 text-text-secondary transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+        >
+          <LogOut size={16} strokeWidth={1.75} aria-hidden />
+          <span className="text-[10px] leading-tight">Log out</span>
+        </button>
       </section>
     </nav>
   );
