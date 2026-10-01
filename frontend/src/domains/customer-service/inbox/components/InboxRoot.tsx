@@ -18,6 +18,7 @@ import { Sheet } from "@/ui/overlay/Sheet";
 
 import { CaseHeader } from "../case/CaseHeader";
 import { CaseTimeline } from "../case/CaseTimeline";
+import { WorkflowSuggestion } from "../case/WorkflowSuggestion";
 import { CommercePanel } from "../case/CommercePanel";
 import { NextStep } from "../case/NextStep";
 import type { CaseState, NextStep as Step } from "../case/caseState";
@@ -155,6 +156,10 @@ export default function InboxRoot({ queue, caseFile, composer }: InboxRootProps)
                 loading={caseFile.activityLoading}
                 error={caseFile.activityError}
                 onRetry={caseFile.refreshActivity}
+              />
+              <WorkflowSuggestion
+                conversationId={conversation.id}
+                topic={queue.items.find((item) => item.conversation_id === conversation.id)?.topic}
               />
               <NextStep step={caseFile.nextStep} conversationId={conversation.id} decision={caseFile.decision} />
               {composer.error ? (

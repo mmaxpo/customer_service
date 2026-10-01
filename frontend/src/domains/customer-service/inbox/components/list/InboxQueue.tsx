@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Search, SlidersHorizontal, Tag, X } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -30,6 +30,7 @@ const VIEWS = [
   { value: "pending", label: "Pending" },
   { value: "resolved", label: "Resolved" },
   { value: "priority", label: "Priority" },
+  { value: "unanswered", label: "Not answered by a workflow" },
 ] as const;
 
 type QueueView = (typeof VIEWS)[number]["value"];
@@ -102,6 +103,16 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
 export function InboxQueue({ items, folder, onFolderChange, selectedConversationId, onSelect, loading, error, refresh }: Props) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<QueueView>("all");
+  const waiting = useWaitingForPerson();
+  const unanswered = useMemo(
+    () => new Set((waiting ?? []).filter((row) => row.workflow_gap).map((row) => row.conversation_id)),
+    [waiting],
+  );
+
+  // The Automations page links here with ?view=unanswered.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "unanswered") setView("unanswered");
+  }, []);
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [topic, setTopic] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -120,6 +131,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
       if (view === "pending" && ticketStatus !== "pending") return false;
       if (view === "resolved" && ticketStatus !== "resolved") return false;
       if (view === "priority" && !URGENT.has(priority)) return false;
+      if (view === "unanswered" && !unanswered.has(item.conversation_id)) return false;
       if (urgentOnly && !URGENT.has(lower(item.ticket?.priority))) return false;
       if (topic && item.topic !== topic) return false;
       if (!needle) return true;
@@ -129,7 +141,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
         .toLowerCase()
         .includes(needle);
     });
-  }, [items, query, urgentOnly, view, topic]);
+  }, [items, query, urgentOnly, view, topic, unanswered]);
 
   const topics = useMemo(
     () => [...new Set(items.map((item) => item.topic).filter((value): value is string => Boolean(value)))].sort(),
@@ -144,9 +156,10 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
       pending: items.filter((item) => lower(item.ticket?.status || item.status) === "pending").length,
       resolved: items.filter((item) => lower(item.ticket?.status || item.status) === "resolved").length,
       priority: items.filter((item) => URGENT.has(lower(item.ticket?.priority))).length,
+      unanswered: items.filter((item) => unanswered.has(item.conversation_id)).length,
     };
     return counts;
-  }, [items]);
+  }, [items, unanswered]);
 
   const moveSelection = (direction: 1 | -1) => {
     if (visible.length === 0) return;

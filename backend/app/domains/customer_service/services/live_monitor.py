@@ -247,6 +247,12 @@ class LiveMonitorService:
                     "last_customer_message": (row.last_customer_message or "")[:200],
                     "waiting_since": row.last_customer_at,
                     "reason": reason,
+                    # A workflow could be built for this: none answered, or one handed it over.
+                    "workflow_gap": "unanswered"
+                    if row.run_status is None and row.last_agent_at is None
+                    else "handed_over"
+                    if row.problem == "handoff"
+                    else None,
                     "reply_due_at": due_at,
                     "target_state": target_state,
                 }

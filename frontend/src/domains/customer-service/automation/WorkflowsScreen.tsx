@@ -344,7 +344,7 @@ export default function WorkflowsScreen() {
               <div className="h-4" />
               <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-[12.5px] tabular-nums text-text-secondary">
                 <span>{data.routing.unmatched_7d} {data.routing.unmatched_7d === 1 ? "message" : "messages"}</span>
-                <Link href="/app/inbox" className="font-medium text-primary hover:underline">Open inbox</Link>
+                <Link href="/app/inbox?view=unanswered" className="font-medium text-primary hover:underline">See them in the inbox</Link>
               </div>
             </li>
           </ul>

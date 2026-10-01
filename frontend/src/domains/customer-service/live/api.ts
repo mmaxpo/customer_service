@@ -11,6 +11,8 @@ export type WaitingConversation = {
   last_customer_message: string;
   waiting_since: string;
   reason: string;
+  // No workflow answered this message, or a workflow handed it to the team.
+  workflow_gap: "unanswered" | "handed_over" | null;
   // Reply target from Settings → Workspace; null when no target is set.
   reply_due_at: string | null;
   target_state: "on_track" | "close" | "missed" | null;
