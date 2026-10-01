@@ -185,9 +185,10 @@ Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/b
 
 ---
 
-## 3b. Colours and themes (2026-10-01, **not committed yet**)
+## 3b. Colours and themes (2026-10-01, committed as `9f15a400` except where noted)
 - Light theme = "warm neutral" (owner's choice B): page `#efece6`, borders `#d3ccbf`, text `#211e1a`; brand blue and AI purple unchanged. Dark theme (choice D) is a second set of the same tokens under `[data-theme="dark"]` in `src/app/globals.css`.
-- Switch: Settings tabs row → "Dark mode / Light mode" (`domains/workspace/ThemeSwitch.tsx`). The choice is stored in the browser (`localStorage` key `tajeran-theme`), not on the account; an inline script in `src/app/layout.tsx` applies it before first paint.
+- Switch: Settings tabs row → "Dark mode / Light mode" (`domains/workspace/ThemeSwitch.tsx`). The choice is kept in the browser (`localStorage` key `tajeran-theme`, applied before first paint by an inline script in `src/app/layout.tsx`) and on the user's account: `GET` / `PUT /workspaces/current/theme` read and write `user.ui_theme` with plain SQL, and `ThemeSync` in the app layout applies the account's choice on load. **The column needs migration `ui01` (`backend/migrations/versions/ui01_user_ui_theme.py`); until the owner runs `just migrate` the endpoints return 500 and the choice stays per-browser.** Not committed yet.
+- Login and the other auth pages already follow the theme (the new `components/marketing/AuthShell` uses the tokens); they have no switch of their own, so they show whatever this browser last used.
 - Rule for new UI: use the tokens (`bg-surface`, `bg-background`, `bg-muted`, `border-border`, `text-foreground`, `text-text-secondary`, `text-primary`, `bg-ai-50`, `bg-warn-50`, …), never `bg-white` / `text-slate-*`, or the screen won't follow the theme. Settings, Knowledge, Routing, Billing, the Desk page and `ui/product/*` were converted.
 - Inbox separation (committed `aebc0886`): tinted list and customer panel, white case area, tinted case header; customer / Tajeran / team / note entries each have their own colour.
 - Not converted (still fixed colours): the unused `AppSidebar`, the logo mark, the old mission-board and builder screens, public and auth pages, and the chat widget on the store.

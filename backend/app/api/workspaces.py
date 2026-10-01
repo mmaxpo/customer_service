@@ -5,7 +5,11 @@ from datetime import datetime
 from urllib.parse import urlencode
 from uuid import UUID
 
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_verified_user
@@ -152,6 +156,37 @@ async def get_current_workspace(
         user_id=principal.user_id,
     )
     return _workspace_read(workspace, membership)
+
+
+class ThemeChoice(BaseModel):
+    theme: Literal["light", "dark"]
+
+
+# The signed-in user's light / dark choice. Read and written with plain SQL so
+# the User model does not depend on the column (migration ui01) being there.
+@router.get("/current/theme")
+async def get_theme(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    theme = await db.scalar(
+        text('SELECT ui_theme FROM "user" WHERE id = :id'), {"id": principal.user_id}
+    )
+    return {"theme": theme}
+
+
+@router.put("/current/theme")
+async def set_theme(
+    payload: ThemeChoice,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        text('UPDATE "user" SET ui_theme = :theme WHERE id = :id'),
+        {"theme": payload.theme, "id": principal.user_id},
+    )
+    await db.commit()
+    return {"theme": payload.theme}
 
 
 @router.get("/current/usage")
