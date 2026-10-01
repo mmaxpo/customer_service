@@ -58,9 +58,9 @@ def plain_reason(problem: str | None) -> str | None:
 
 
 def _failed_reason(reason: str | None) -> str | None:
-    # A run that failed on every attempt sent nothing, standby reply included.
+    # A run that failed on every attempt sends only the safe "our team will reply" message.
     if reason and reason.startswith("The AI provider isn't responding"):
-        return "The AI provider isn't responding, so the customer got no reply."
+        return "The AI provider isn't responding, so the customer was told your team will reply."
     return reason
 
 

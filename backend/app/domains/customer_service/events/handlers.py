@@ -731,6 +731,69 @@ async def publish_customer_service_workflow_job_realtime(
     }
 
 
+DEAD_LETTER_SAFE_REPLY = (
+    "Thanks for your message. A member of our team will get back to you shortly."
+)
+
+
+async def send_customer_chat_safe_reply_on_dead_letter(
+    event,
+    ctx,
+):
+    """A chat workflow failed on every attempt: tell the customer a person will reply."""
+    payload = dict(event.payload or {})
+
+    if str(payload.get("job_type") or "") != "workflow.run" or not payload.get(
+        "job_id"
+    ):
+        return {"sent": False, "reason": "job_type_not_supported"}
+
+    from app.platform.jobs.repository import JobRepository
+
+    job = await JobRepository(ctx.db).get(UUID(str(payload["job_id"])))
+    extras = ((job.payload or {}).get("extras") or {}) if job is not None else {}
+    session_id = ((extras.get("event") or {}).get("payload") or {}).get("session_id")
+
+    if not extras.get("customer_service") or not session_id:
+        return {"sent": False, "reason": "not_customer_chat"}
+
+    from app.domains.customer_service.repositories.chat_repository import (
+        ChatRepository,
+    )
+    from app.domains.customer_service.services.chat_service import (
+        CustomerChatService,
+    )
+
+    service = CustomerChatService(ChatRepository(ctx.db))
+    session = await service.get_session(session_id=UUID(str(session_id)))
+
+    if session is None or str(session.user_id) != str(job.user_id):
+        return {"sent": False, "reason": "session_not_found"}
+
+    # One safe reply per failed job, even if the event is delivered twice.
+    client_message_id = f"dead-letter:{job.id}"
+    existing = await service.repository.get_message_by_client_message_id(
+        session_id=session.id,
+        client_message_id=client_message_id,
+    )
+
+    if existing is not None:
+        return {"sent": False, "reason": "already_sent"}
+
+    chat_message = await service.add_ai_message(
+        session_id=session.id,
+        content=DEAD_LETTER_SAFE_REPLY,
+        client_message_id=client_message_id,
+    )
+    await service.add_inbox_ai_message_for_chat_session(
+        session=session,
+        chat_message=chat_message,
+    )
+    await ctx.db.commit()
+
+    return {"sent": True, "chat_message_id": str(chat_message.id)}
+
+
 def register_customer_service_event_handlers(registry) -> None:
     registry.subscribe(
         "customer_service.omnichannel.message.received",
@@ -775,4 +838,8 @@ def register_customer_service_event_handlers(registry) -> None:
     registry.subscribe(
         "job.dead_lettered",
         project_customer_support_repair_job_dead_lettered,
+    )
+    registry.subscribe(
+        "job.dead_lettered",
+        send_customer_chat_safe_reply_on_dead_letter,
     )

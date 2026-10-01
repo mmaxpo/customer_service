@@ -104,14 +104,9 @@ class LlmGenerateNode:
                 text = (getattr(res, "text", None) or "").strip()
                 max_tokens = retry_max_tokens
         except LLMProviderError as exc:
-            job = (getattr(ctx, "extras", None) or {}).get("_job") or {}
-            attempt = int(job.get("attempt") or 0)
-            max_attempts = int(job.get("max_attempts") or 0)
-            final_job_attempt = bool(max_attempts and attempt >= max_attempts)
-
-            if not config.provider_failure_fallback or (
-                exc.retryable and not final_job_attempt
-            ):
+            # The standby reply goes out on the first failure: the customer
+            # should not wait for job retries while the provider is down.
+            if not config.provider_failure_fallback:
                 raise
 
             text = config.provider_failure_fallback.strip()

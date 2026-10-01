@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.embeddings import embed_query
 from app.services.knowledge_ingest import _vector_to_pgvector_str
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_fts(score: float | None) -> float:
@@ -61,8 +64,10 @@ async def vector_search(
     user_id: uuid.UUID,
     query: str,
     k: int = 12,
+    vector: list[float] | None = None,
 ) -> list[dict[str, Any]]:
-    vector = await embed_query(query)
+    if vector is None:
+        vector = await embed_query(query)
 
     result = await db.execute(
         text(
@@ -155,11 +160,19 @@ async def hybrid_retrieve(
         k=k_fts,
     )
 
+    try:
+        vector = await embed_query(query)
+    except Exception:
+        # Embedding provider is down: keyword results still answer the question.
+        logger.warning("knowledge search: embedding failed, using keyword results only", exc_info=True)
+        return merge_results(fts, [])[:pre_rerank_top_n]
+
     vec = await vector_search(
         db,
         user_id=user_id,
         query=query,
         k=k_vec,
+        vector=vector,
     )
 
     return merge_results(fts, vec)[:pre_rerank_top_n]

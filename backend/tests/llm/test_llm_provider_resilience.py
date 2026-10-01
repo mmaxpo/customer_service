@@ -141,25 +141,19 @@ def _runtime_context(*, attempt: int, max_attempts: int):
 
 
 @pytest.mark.asyncio
-async def test_llm_node_retries_durably_before_using_handoff_fallback():
-    config = LlmGenerateConfig(
-        prompt="reply",
-        save_as="reply",
-        provider_failure_fallback="A human agent will review your message.",
-    )
-
+async def test_llm_node_without_fallback_raises_provider_error():
     with pytest.raises(LLMRateLimitError):
         await LlmGenerateNode().run(
             _runtime_context(attempt=1, max_attempts=3),
             {"vars": {}},
-            config,
+            LlmGenerateConfig(prompt="reply", save_as="reply"),
         )
 
 
 @pytest.mark.asyncio
-async def test_llm_node_uses_handoff_fallback_on_final_durable_attempt():
+async def test_llm_node_uses_handoff_fallback_on_first_attempt():
     result = await LlmGenerateNode().run(
-        _runtime_context(attempt=3, max_attempts=3),
+        _runtime_context(attempt=1, max_attempts=3),
         {"vars": {}},
         LlmGenerateConfig(
             prompt="reply",
