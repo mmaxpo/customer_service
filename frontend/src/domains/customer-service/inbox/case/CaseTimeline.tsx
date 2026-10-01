@@ -6,6 +6,7 @@ import { ChevronRight, LoaderCircle, StickyNote } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
 import type { AutomationActivityEvent } from "@/domains/customer-service/model";
+import { apiErrorMessage, apiJson } from "@/platform/api/client";
 import { cn } from "@/platform/utils";
 
 import { formatDay, formatTime } from "./format";
@@ -24,6 +25,12 @@ type Props = {
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+};
+
+type Translation = {
+  language: string | null;
+  translated: boolean;
+  translations: { original: string; text: string }[];
 };
 
 const actorName = (entry: { actor: string }, customerName: string | null) =>
@@ -109,9 +116,10 @@ function EventRow({ event, customerName, nested = false }: { event: TimelineEven
   );
 }
 
-function EntryView({ entry, customerName }: { entry: TimelineEntry; customerName: string | null }) {
+function EntryView({ entry, customerName, translations }: { entry: TimelineEntry; customerName: string | null; translations: Map<string, string> }) {
   if (entry.kind === "message") {
     const fromCustomer = entry.actor === "customer";
+    const translated = translations.get(entry.body.trim());
     return (
       <div className="flex gap-3">
         <div className="flex w-6 shrink-0 justify-center pt-0.5">
@@ -134,6 +142,12 @@ function EntryView({ entry, customerName }: { entry: TimelineEntry; customerName
             )}
           >
             {entry.body}
+            {translated ? (
+              <p className="mt-2 border-t border-border pt-2 text-[13.5px] text-text-secondary">
+                <span className="mr-1.5 text-[11px] font-medium uppercase tracking-wide">Translation</span>
+                {translated}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -210,10 +224,34 @@ export function CaseTimeline({ conversationId, customerName, items, loading, err
   }), [entries]);
   const scroller = useRef<HTMLDivElement>(null);
   const previousCount = useRef(0);
+  // Translation of the conversation's messages, on request (one AI call).
+  const [translation, setTranslation] = useState<Translation | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  const translations = useMemo(
+    () => new Map((translation?.translations ?? []).map((item) => [item.original.trim(), item.text])),
+    [translation],
+  );
 
   useLayoutEffect(() => {
     previousCount.current = 0;
+    setTranslation(null);
+    setTranslateError(null);
   }, [conversationId]);
+
+  async function translate() {
+    setTranslating(true);
+    setTranslateError(null);
+    try {
+      setTranslation(
+        await apiJson<Translation>(`/api/customer-service/studio/conversations/${conversationId}/translate`, { method: "POST" }),
+      );
+    } catch (err) {
+      setTranslateError(apiErrorMessage(err, "Could not translate this conversation."));
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   useEffect(() => {
     const node = scroller.current;
@@ -237,7 +275,18 @@ export function CaseTimeline({ conversationId, customerName, items, loading, err
             <span className="rounded-full bg-muted px-2 py-0.5 text-text-secondary">{activitySummary.messages} messages</span>
             {activitySummary.notes ? <span className="rounded-full bg-muted px-2 py-0.5 text-text-secondary">{activitySummary.notes} notes</span> : null}
             {activitySummary.automations ? <span className="rounded-full bg-ai-50 px-2 py-0.5 text-ai-accent">{activitySummary.automations} Tajeran events</span> : null}
-            <span className="ml-auto text-text-secondary">Newest activity below</span>
+            <span className="ml-auto text-text-secondary">
+              {translation ? (
+                translation.translated
+                  ? `Customer wrote in ${translation.language ?? "another language"} · translated`
+                  : `Customer wrote in ${translation.language ?? "your language"} · no translation needed`
+              ) : (
+                <button type="button" onClick={() => void translate()} disabled={translating} className="font-medium text-primary hover:underline disabled:opacity-60">
+                  {translating ? "Translating…" : "Translate conversation"}
+                </button>
+              )}
+            </span>
+            {translateError ? <p role="alert" className="w-full text-danger">{translateError}</p> : null}
           </div>
         ) : null}
         {error && !items ? (
@@ -285,7 +334,7 @@ export function CaseTimeline({ conversationId, customerName, items, loading, err
                       <span className="h-px flex-1 bg-border" aria-hidden />
                     </div>
                   ) : null}
-                  <EntryView entry={entry} customerName={customerName} />
+                  <EntryView entry={entry} customerName={customerName} translations={translations} />
                 </motion.li>
               );
             })}

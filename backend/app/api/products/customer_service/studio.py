@@ -12,6 +12,9 @@ from app.domains.customer_service.security.rbac import (
 from app.domains.customer_service.services.automation_studio import (
     AutomationStudioService,
 )
+from app.domains.customer_service.services.conversation_translation import (
+    ConversationTranslationService,
+)
 from app.domains.customer_service.services.desk_insights import DeskInsightsService
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
 
@@ -25,6 +28,17 @@ async def desk_insights(
     current_user=Depends(require_customer_service_permission("cs.conversations.read")),
 ):
     return await DeskInsightsService(db).insights(workspace_id=current_user.id, days=days)
+
+
+@studio_router.post("/conversations/{conversation_id}/translate")
+async def translate_conversation(
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await ConversationTranslationService(db).translate(
+        workspace_id=current_user.id, conversation_id=conversation_id
+    )
 
 
 @studio_router.get("/live/now")
