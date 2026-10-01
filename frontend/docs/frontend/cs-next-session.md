@@ -1,6 +1,6 @@
 # Customer service: next session handoff
 
-Written 2026-09-30. This replaces `automation-next-jobs.md` as the current plan
+Written 2026-09-30, updated 2026-10-01. This replaces `automation-next-jobs.md` as the current plan
 (that file is kept for history). Read this whole file before starting.
 
 Work **one task at a time**. For each task: inspect the code, build the
@@ -27,7 +27,9 @@ Follow `frontend/CLAUDE.md`.
   - `POST .../sessions/{session_id}/messages` with `{"content": "..."}`
   - `GET .../sessions/{session_id}/messages`
   - An existing clean test session: `4f402816-3bff-449a-ba7a-5a74ffb2514c` ("Studio Test Customer", conversation `0e7425ed-43ad-4c4e-8d21-cd3093388ea3`).
-- The AI provider (OpenAI) works again as of 2026-09-30.
+- The AI provider (OpenAI) works; the owner set a $2 spend limit on 2026-10-01. The app uses `gpt-4.1-mini` (cheap). If chat replies turn into the standby message, check credits first.
+- Test orders in the Shopify dev store (`tajeran-support-dev`), all marked test, example.com emails: #1006 Anna Keller `anna.keller.test@example.com` (paid, unfulfilled), #1007 Ben Ortiz `ben.ortiz.test@example.com` (paid, fulfilled, no tracking), #1008 Clara Voss `clara.voss.test@example.com` (payment pending). Old order #1001 has no email, so chat never shares it (see order protection below).
+- Publishing a workflow version from an agent session needs the owner's explicit yes each time.
 
 Owner rules: only real backend data in the app (no fixtures); never restart shared Docker services (postgres, redis) without asking; **never delete data or workflows without asking**; cancellations, refunds and damaged-item requests stay human-only (hard-coded in `backend/app/api/products/customer_service/channels.py`, `safe_handoff_intents`).
 
@@ -49,7 +51,24 @@ Spec: `backend/.claude/features/cs-frontend-spec.md`. Audit: `backend/.claude/fe
 | Ask TCOS briefing: real config keys for every library step; prompts may only use `{{input}}` / `{{vars.key}}`; validation blocks `{{#each}}`-style templates | `automation_studio.py` (`PROPOSAL_SYSTEM`, `_generate`, `_validate`) |
 | Three sample help articles ("Shipping policy (sample)", "Returns and refunds (sample)", "Gift wrapping (sample)") | Created via `POST /api/customer-service/knowledge/sources/inline`. The owner will replace them with real policies. |
 
-Dev workspace workflow state: "Website chat automation" (`15aad0a7-0217-4162-ad96-cce74340aa92`) is **live on v1 again**. v13 (knowledge search before general replies) was published on 2026-09-30 and answered correctly from the articles, then was rolled back to v1 because its `kb.search` step (OpenAI embeddings) has no outage fallback: when OpenAI returned 429 "no credits remaining", v13 dead-lettered and the customer got nothing, while v1 sends the standby reply. Re-publish v13 (restore version 13) only after OpenAI has credits again **and** kb.search degrades gracefully (fold into Task 3).
+Dev workspace workflow state: "Website chat automation" (`15aad0a7-0217-4162-ad96-cce74340aa92`) is **live on v22** (2026-10-01). Graph: trigger → Remember the conversation → Find order number → Search knowledge → route → (Find order → order reply | general reply) → Reply in chat. All older drafts are discarded.
+
+Built on 2026-10-01 (all verified live through the public chat API, 14/14 correct team flags on v22):
+
+| Behaviour | Where |
+|---|---|
+| Standby reply on the first AI-provider failure (no job retries) | `backend/app/runtime/nodes/builtins/llm_generate.py` |
+| Knowledge search falls back to keyword results when embeddings fail | `backend/app/services/knowledge_retrieval.py` |
+| Dead-lettered chat run sends one safe "team will reply" message (idempotent per job) | `send_customer_chat_safe_reply_on_dead_letter` in `backend/app/domains/customer_service/events/handlers.py`. The inbox shows such a case as "Action failed". |
+| Hand-off marker: a reply that ends with `[HANDOFF]` is sent without the marker and the run gets `meta.handoff_required` → "Needs a person" in the Inbox, "Waiting for a person" in Live (shown at once, no one-minute grace) | `runtime/nodes/customer_chat.py`; the prompts in the workflow carry the hand-off rule; `PROPOSAL_SYSTEM` tells Ask TCOS about it |
+| Order protection: chat shares an order only if the chat's email, or an email typed in the conversation, matches the order's email. No email on the order → "a team member will check" + flag | `_chat_order_refusal` in `backend/app/providers/shopify/runtime/nodes.py`; the chat event payload now carries `customer_email` |
+| Conversation memory: step `customer_service.load_conversation` ("Remember the conversation") puts recent messages in `vars.conversation` (bounded by `CustomerServiceAIContextPolicy`) and the last order number in `vars.conversation_order_ref`, which "Find order number" falls back to | `runtime/nodes/conversation_history.py`, `order_ref.py`. Empty in "Test on past conversations" (dry run has no conversation). |
+| Bot stays quiet once a team member has replied, until the ticket is resolved (`dispatch_skip_reason = team_member_is_handling`) | `backend/app/api/products/customer_service/channels.py` |
+| General return/refund questions with no order number ("How do I return…", "What is your return policy?") go to the help articles; "I want a refund" still starts the order-number intake and the approval flow | `_is_policy_question` in `services/support/customer_support_orchestration.py` |
+| Team notification: count badge on **Live** in the menu + pop-up "X needs a person" on any screen (polls every 15 s) | `frontend/src/domains/customer-service/live/useWaitingForPerson.ts`, `HandoffNotice.tsx`, `ui/layout/AppRail.tsx`, `AppShell.tsx` |
+| Draft test results record `draft_handed_over` per case (not shown in the UI yet) | `automation_studio.py` |
+
+Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
 Work is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
@@ -57,7 +76,9 @@ Work is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
 ## 3. Tasks, in order
 
-### Task 0: Publish v13 and verify live (worker already restarted)
+### Task 0: DONE (superseded by v22, see section 2)
+
+Original task: Publish v13 and verify live
 1. Open `/app/workflows/proposals/b2fc51a0-0665-4bb8-af3a-13f487ad632e`, run "Test again", publish v13.
 2. Send real messages through the public chat API: "Do you ship to Canada?", "Do you ship to Australia?", "Do you offer gift wrapping?", "Where is my order #1001?", "I want a refund for order #1001".
 3. Confirm each answer is correct and comes from the articles or Shopify (no invented facts), `platform_jobs.payload.extras.workflow_version = 13`, and the runs show correctly in Live → Activity log, the Inbox timeline and Desk.
@@ -65,20 +86,26 @@ Work is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
 Done when: live customers get article-based answers on v13.
 
-### Task 1: Ask the owner about git
+### Task 1: DONE (work is committed on `feature/cs-automation-live-desk`; still ask before every commit)
+
+Original task: Ask the owner about git
 Ask whether to commit (and on which branch; current branch is `main`, so propose a feature branch). Don't commit without a yes. Use the attribution lines from the system reminder.
 
-### Task 2: Customer gets no reply when a run fails completely
+### Task 2: DONE (see section 2)
+
+Original task: Customer gets no reply when a run fails completely
 When a `workflow.run` job dead-letters (every attempt failed), the customer gets nothing. Send one safe message ("Thanks for your message. A member of our team will get back to you shortly.") into the chat and inbox, once per failed job, idempotently. Find where jobs are dead-lettered (`backend/app/platform/jobs/`) and where the reply node sends chat messages (`reply.customer_chat`). Prefer a product-layer hook over changing the core job engine. Make sure Live → Now still shows the conversation as waiting for a person.
 
 Done when: a forced failure (e.g. a draft with a broken step published to a test workflow, then restored) leaves the customer with the safe message and the case marked "Needs a person".
 
-### Task 3: Stop 3× retries on AI provider failure
+### Task 3: DONE (see section 2; not yet exercised live with the provider really down)
+
+Original task: Stop 3× retries on AI provider failure
 When the AI provider fails, the worker retries the whole job 3 times (about 27 s before the standby reply). `llm.generate` has `provider_failure_fallback`; find why the job still fails/retries (check how `LLMProviderError` / circuit-open is raised and how the job decides to retry). Goal: the standby reply goes out on the first failure, no job retry for provider outages.
 
 Done when: with the provider simulated down (in a test, not by breaking the real key), the customer gets the standby reply within a few seconds and the job has 1 attempt.
 
-### Task 4: Desk filter buttons do nothing
+### Task 4: NEXT. Desk filter buttons do nothing
 `src/app/(app)/app/dashboard/page.tsx` has "Time / Channel / Team / Priority / Customer" buttons and a hard-coded "Last 30 days". Either make Time work (7 / 30 / 90 days, passed to the Automation and Satisfaction reports and the ticket data) or remove the buttons that can't work yet. Ask the owner which buttons to keep before building more than Time.
 
 ### Task 5: Chat widget down for duplicate customers
@@ -115,3 +142,7 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 - `backend/app/domains/customer_service/repositories/workflow_executions.py` `list_for_user` loads the last 100 workspace jobs and filters by conversation in Python, so old conversations can lose their runs on a busy store.
 - `frontend/src/ui/layout/AppSidebar.tsx` and the old `domains/customer-service/channels/components/*` are unused.
 - Some `cs_chat_messages.meta` values are JSON `null`; merge into meta with `CASE WHEN jsonb_typeof(meta)='object' ...`, never `coalesce(meta,'{}') || ...`.
+- Draft test results know which replies would be handed to the team (`draft_handed_over`), but the proposal screen doesn't show it.
+- The order reply can't see the shipping country, so it may quote US delivery times to a Canadian order.
+- The Inbox side panel attaches an order the customer merely mentions to that customer (agent-facing only).
+- Six chat tests under `backend/tests/customer_service/chat` and 30 under `tests/customer_service` (objective/learning routers) fail with 403 on the baseline too.
