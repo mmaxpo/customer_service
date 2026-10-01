@@ -26,7 +26,7 @@ LANGUAGES = {
 }
 
 
-def reply_language_rule(setting: dict | None, default_locale: str | None) -> str:
+def reply_language_rule(setting: dict | None, default_locale: str | None, latest: str = "") -> str:
     """The language instruction for reply prompts, from Settings → Chat widget.
     With no setting saved, replies follow the customer's language."""
     setting = setting or {}
@@ -34,16 +34,19 @@ def reply_language_rule(setting: dict | None, default_locale: str | None) -> str
     if setting.get("customer_language") is False:
         return f"Write the reply in {default}, whatever language the customer writes in."
     allowed = [LANGUAGES[code] for code in setting.get("languages") or [] if code in LANGUAGES]
+    # Quoting the message keeps the model from following the language of the
+    # earlier messages when the customer switches language mid-conversation.
+    quoted = f' The latest customer message is: "{latest[:300]}".' if latest else ""
     if allowed:
         return (
-            "Write the reply in the language of the latest customer message (the "
-            "'Customer message' at the top, not the earlier messages) if it is one of: "
-            f"{', '.join(allowed)}. Otherwise write the reply in {default}."
+            "Write the reply in the language of the latest customer message, even if "
+            f"earlier messages were in another language, if it is one of: {', '.join(allowed)}. "
+            f"Otherwise write the reply in {default}.{quoted}"
         )
     return (
-        "Write the reply in the language of the latest customer message (the "
-        "'Customer message' at the top, not the earlier messages): English for an "
-        "English message, German for a German message, and so on."
+        "Write the reply in the language of the latest customer message, even if "
+        "earlier messages were in another language: English for an English message, "
+        f"German for a German message, and so on.{quoted}"
     )
 
 
@@ -132,7 +135,7 @@ class LoadConversationNode:
                     config.save_as: history or "(no earlier messages)",
                     "conversation_order_ref": order_ref,
                     "reply_language_rule": reply_language_rule(
-                        (widget_meta or {}).get("reply_language"), default_locale
+                        (widget_meta or {}).get("reply_language"), default_locale, current
                     ),
                 },
             },

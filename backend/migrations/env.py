@@ -20,8 +20,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Use DATABASE_URL from the selected .env.dev/.env.prod contract or process env.
-db_url = os.environ["DATABASE_URL"]
+# Use DATABASE_URL from the process env, or from the app settings, which read
+# the selected .env.dev / .env.prod file (load_dotenv above only finds ".env").
+db_url = os.environ.get("DATABASE_URL")
+if not db_url:
+    from app.core.config import settings
+
+    db_url = settings.DATABASE_URL
 config.set_main_option("sqlalchemy.url", db_url)
 
 # Import metadata (IMPORTANT: must import model classes)
