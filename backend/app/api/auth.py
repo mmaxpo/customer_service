@@ -459,7 +459,7 @@ class PasswordChangeRequest(BaseModel):
         max_length=1024,
     )
     new_password: str = Field(
-        min_length=12,
+        min_length=8,
         max_length=1024,
     )
 
@@ -470,7 +470,7 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordResetConfirm(BaseModel):
     token: str = Field(min_length=32, max_length=512)
-    new_password: str = Field(min_length=12, max_length=1024)
+    new_password: str = Field(min_length=8, max_length=1024)
 
 
 class EmailChangeRequest(BaseModel):

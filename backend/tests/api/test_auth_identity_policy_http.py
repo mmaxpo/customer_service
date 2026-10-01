@@ -24,11 +24,9 @@ def test_normalize_email_trims_and_casefolds():
 @pytest.mark.parametrize(
     "password",
     [
-        "short",
-        "alllowercase123!",
-        "ALLUPPERCASE123!",
+        "short1",
         "NoNumbersHere!",
-        "NoSymbolsHere123",
+        "12345678",
     ],
 )
 def test_password_policy_rejects_weak_passwords(password: str):
@@ -38,6 +36,10 @@ def test_password_policy_rejects_weak_passwords(password: str):
 
 def test_password_policy_accepts_v1_password():
     assert validate_password_policy("Strong-Password-123!") == "Strong-Password-123!"
+
+
+def test_password_policy_accepts_a_simple_eight_character_password():
+    assert validate_password_policy("sunshine7") == "sunshine7"
 
 
 @pytest.mark.asyncio
@@ -94,7 +96,7 @@ async def test_signup_rejects_password_outside_policy():
 @pytest.mark.asyncio
 async def test_password_reset_rejects_password_outside_shared_policy():
     # The HTTP schema already rejects short values. This proves the domain
-    # policy also rejects a >=12-character password missing required classes.
+    # policy also rejects a long-enough password with no number.
     email = f"reset-policy-{uuid4()}@example.com"
     original_password = "Original-Password-123!"
 

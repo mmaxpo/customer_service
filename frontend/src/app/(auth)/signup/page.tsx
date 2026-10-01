@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { PasswordInput } from "@/ui/primitives/password-input";
 import { FormEvent, useState } from "react";
+import { authButton, authInput, authLabel, AuthShell, AuthStatus } from "@/components/marketing/AuthShell";
 import { ApiError, authApi } from "@/platform/api";
 
 function errorMessage(error: unknown) {
@@ -52,32 +54,29 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-10">
-      <section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold text-slate-500">Tajeran.ai · Support OS</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">Create your workspace</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Connect Shopify, bring support into one inbox, and start with a clear setup checklist.</p>
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <label className="block text-sm font-medium text-slate-700">Your name (optional)
-            <input className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-500" value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
-          </label>
-          <label className="block text-sm font-medium text-slate-700">Work email
-            <input className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-500" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" />
-          </label>
-          <label className="block text-sm font-medium text-slate-700">Password
-            <input className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 outline-none focus:border-slate-500" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required minLength={8} autoComplete="new-password" />
-          </label>
-          <label className="flex items-start gap-3 text-sm leading-5 text-slate-600">
-            <input className="mt-1" type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-            <span>I agree to the Terms and Privacy Policy.</span>
-          </label>
-          <button disabled={loading} className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
-            {loading ? "Creating workspace…" : "Create workspace"}
-          </button>
-        </form>
-        {status && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{status}</p>}
-        <p className="mt-6 text-center text-sm text-slate-500">Already have an account? <Link href="/login" className="font-semibold text-slate-950">Log in</Link></p>
-      </section>
-    </main>
+    <AuthShell
+      title="Create your workspace"
+      subtitle="Connect Shopify, add your help articles, and let the agents take the first conversation."
+      footer={<p>Already have an account? <Link href="/login" className="font-medium text-primary hover:underline">Log in</Link></p>}
+    >
+      <form onSubmit={submit} className="mt-7 space-y-4">
+        <label className={authLabel}>Your name (optional)
+          <input className={authInput} value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" />
+        </label>
+        <label className={authLabel}>Work email
+          <input className={authInput} value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email" placeholder="jane@mystore.com" />
+        </label>
+        <label className={authLabel}>Password
+          <PasswordInput className={authInput} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+          <span className="mt-1.5 block text-[12.5px] font-normal text-text-secondary">At least 8 characters, with a letter and a number.</span>
+        </label>
+        <label className="flex items-start gap-2.5 text-[13.5px] leading-5 text-text-secondary">
+          <input className="mt-0.5 h-4 w-4 accent-primary" type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+          <span>I agree to the Terms and Privacy Policy.</span>
+        </label>
+        <button disabled={loading} className={authButton}>{loading ? "Creating workspace…" : "Create workspace"}</button>
+      </form>
+      <AuthStatus message={status} tone="error" />
+    </AuthShell>
   );
 }

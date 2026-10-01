@@ -9,7 +9,7 @@ import { authApi } from "@/platform/api";
 
 // Kept across sign-up, email verification and login, so the invitation is
 // accepted as soon as the person is signed in (see PendingInvite).
-export const INVITE_KEY = "tajeran-invite-token";
+const INVITE_KEY = "tajeran-invite-token";
 
 type Preview = { email: string; role: string; workspace_name: string };
 type Step = "loading" | "invalid" | "signed-out" | "wrong-account" | "joining";

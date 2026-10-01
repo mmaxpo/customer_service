@@ -67,18 +67,18 @@ def normalize_email(email: str) -> str:
     return email.strip().casefold()
 
 
+PASSWORD_MIN_LENGTH = 8
+
+
 def validate_password_policy(password: str) -> str:
-    """Validate the shared v1 account password policy."""
-    if len(password) < 12:
-        raise PasswordPolicyError("Password must be at least 12 characters long")
-    if not any(char.islower() for char in password):
-        raise PasswordPolicyError("Password must contain a lowercase letter")
-    if not any(char.isupper() for char in password):
-        raise PasswordPolicyError("Password must contain an uppercase letter")
+    """Validate the shared account password policy: at least 8 characters, with
+    a letter and a number. Length matters more than forced symbols or capitals."""
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise PasswordPolicyError(f"Password must be at least {PASSWORD_MIN_LENGTH} characters long")
+    if not any(char.isalpha() for char in password):
+        raise PasswordPolicyError("Password must contain a letter")
     if not any(char.isdigit() for char in password):
         raise PasswordPolicyError("Password must contain a number")
-    if not any(not char.isalnum() for char in password):
-        raise PasswordPolicyError("Password must contain a symbol")
     return password
 
 
