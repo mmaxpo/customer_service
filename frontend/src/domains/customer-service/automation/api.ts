@@ -210,6 +210,11 @@ export const studioApi = {
   setWorkflowEnabled: (id: string, enabled: boolean) =>
     apiJson(`${base}/workflows/${id}/enabled`, { method: "POST", body: jsonBody({ enabled }) }),
 
+  setWorkflowKeywords: (id: string, keywords: string[]) =>
+    apiJson(`${base}/workflows/${id}/keywords`, { method: "POST", body: jsonBody({ keywords }) }),
+
+  deleteWorkflow: (id: string) => apiJson(`${base}/workflows/${id}`, { method: "DELETE" }),
+
   workflow: (id: string) => apiJson<WorkflowDetail>(`${base}/workflows/${id}`),
 
   versions: (id: string) => apiJson<VersionHistory>(`${base}/workflows/${id}/versions`),

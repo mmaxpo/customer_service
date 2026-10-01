@@ -179,6 +179,33 @@ async def set_workflow_enabled(
     )
 
 
+class WorkflowKeywords(BaseModel):
+    keywords: list[str] = Field(min_length=1, max_length=12)
+
+
+@studio_router.post("/workflows/{workflow_id}/keywords")
+async def set_workflow_keywords(
+    workflow_id: UUID,
+    payload: WorkflowKeywords,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).set_workflow_keywords(
+        workspace_id=current_user.id, subscription_id=workflow_id, keywords=payload.keywords
+    )
+
+
+@studio_router.delete("/workflows/{workflow_id}", status_code=204)
+async def delete_workflow(
+    workflow_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    await AutomationStudioService(db).delete_workflow(
+        workspace_id=current_user.id, subscription_id=workflow_id
+    )
+
+
 @studio_router.get("/node-library")
 async def node_library(
     db: AsyncSession = Depends(get_db),

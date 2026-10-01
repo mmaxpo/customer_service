@@ -694,6 +694,28 @@ class AutomationStudioService:
         await self.db.commit()
         return {"workflow_id": str(subscription.id), "enabled": enabled}
 
+    async def _prompt_workflow(self, workspace_id: UUID, subscription_id: UUID):
+        subscription, _ = await self._subscription(workspace_id, subscription_id)
+        if (subscription.meta or {}).get("source") != "studio_prompt":
+            raise HTTPException(status_code=409, detail="This workflow can't be changed here.")
+        return subscription
+
+    async def set_workflow_keywords(self, *, workspace_id: UUID, subscription_id: UUID, keywords: list[str]) -> dict:
+        subscription = await self._prompt_workflow(workspace_id, subscription_id)
+        keywords = _keywords(keywords)
+        if not keywords:
+            raise HTTPException(status_code=422, detail="Add at least one keyword so the workflow knows which messages to answer.")
+        subscription.filters = {**(subscription.filters or {}), "keywords": keywords}
+        await self.db.commit()
+        return {"workflow_id": str(subscription.id), "keywords": keywords}
+
+    async def delete_workflow(self, *, workspace_id: UUID, subscription_id: UUID) -> None:
+        subscription = await self._prompt_workflow(workspace_id, subscription_id)
+        if subscription.is_active:
+            raise HTTPException(status_code=409, detail="Turn this workflow off before deleting it.")
+        await self.db.delete(subscription)
+        await self.db.commit()
+
     async def _proposal_row(self, workspace_id: UUID, proposal_id: UUID) -> dict:
         result = await self.db.execute(
             text(

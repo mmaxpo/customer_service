@@ -16,7 +16,7 @@ Follow `frontend/CLAUDE.md`.
 |---|---|---|
 | Frontend | Docker container `frontend-dev` on `:3000`, mounts `frontend/` | Typecheck: `docker exec frontend-dev sh -c "cd /app; npx tsc --noEmit -p ."`. No ESLint config. |
 | Backend API | `uv run uvicorn app.main:app --reload` on `:8000` (owner's terminal) | Auto-reloads on file changes. |
-| Job worker | `uv run python -m app.platform.jobs` (owner's terminal) | **Does NOT auto-reload.** Live chat runs execute here; proposal "Test on past conversations" runs in the API. After changing `backend/app/runtime/**` or anything a workflow run executes, ask the owner to restart the worker. The owner restarted it at 17:05 on 2026-09-30, so it has all fixes so far. |
+| Job worker | `uv run python -m app.platform.jobs` (owner's terminal). With auto-reload (development only): `uv run watchfiles --filter python "python -m app.platform.jobs" app` from `backend/`; it restarts the worker whenever a Python file under `app/` changes (not yet confirmed on the owner's machine; a restart can interrupt a run that is in progress) | **The plain command does NOT auto-reload.** Live chat runs execute here; proposal "Test on past conversations" runs in the API. After changing `backend/app/runtime/**` or anything a workflow run executes, ask the owner to restart the worker. The owner restarted it at 17:05 on 2026-09-30, so it has all fixes so far. |
 | DB | `docker exec postgres-dev psql -U postgres -d postgres` | Huge amounts of test data: always filter by workspace. |
 | Browser | Claude browser pane; the owner logs in there | Sessions now refresh automatically (`/api/auth/refresh`). A raw `fetch` from `javascript_tool` does not refresh: call `POST /api/auth/refresh` first. Coordinate clicks from the browser tool sometimes miss; verify with a screenshot. |
 
@@ -166,14 +166,16 @@ Cluster customer messages from the last 7 days that no workflow answered (outcom
 Original task: Answers in the customer's language (uses AI)
 Settings → Workspace: "Reply in the customer's language" + supported languages. `cs_conversation_insights.language` already detects language. In the inbox, show "Customer wrote in German · translated" with a translation for the team.
 
-### New workflow from a prompt: DONE, **not committed yet** (ask the owner)
+### New workflow from a prompt: DONE (committed as `e233c620`; keyword editing, delete and the clearer Ask bar are **not committed yet**)
 Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/builder` redirect to `/app/workflows`).
 - Ask bar → "+ New workflow" → TCOS drafts it from a starter graph (`STARTER_WORKFLOW`), names it and proposes keywords and an optional topic. Nothing is saved until **Save**; the draft panel lets the owner edit name, keywords and topic.
 - Save creates a `CustomerServiceEventSubscription` with `workflow_json`, `filters.keywords` (required, so it can never catch every message), optional `filters.intent` (general / shipping / refund), `is_active = false`, `meta.source = "studio_prompt"`. The card shows "Runs when a message contains: …" and a Turn on / Turn off link (only for workflows made this way). Steps are edited with the existing "Edit steps" screen.
 - A matching non-fallback workflow suppresses the fallback "Website chat automation", so one message gets one answer.
 - Code: `draft_workflow`, `create_workflow`, `set_workflow_enabled` in `automation_studio.py`; `POST /studio/workflows/draft`, `POST /studio/workflows`, `POST /studio/workflows/{id}/enabled`; `WorkflowsScreen.tsx`, `automation/api.ts`.
 - Verified live: test workflow "Gift Wrap Help" (`5abb161f-e119-44d7-8667-5ccbdc2ff96f`, left switched **off**) answered "Do you offer gift wrapping?" while a shipping question still went to the fallback.
-- Not built: changing keywords after saving, deleting a workflow from the UI, and "Review draft" on the unanswered-topic suggestions (it could now prefill this flow).
+- Cards of prompt-made workflows have "Edit keywords" and, while switched off, "Delete" (asks for confirmation; removes the `cs_event_subscriptions` row). `POST /studio/workflows/{id}/keywords`, `DELETE /studio/workflows/{id}`; both refuse workflows not made from a prompt.
+- Adding steps: the step editor inserts one step on a connection (no hand-drawn branches). Branching and several AI steps side by side are done by asking TCOS in words. Checked on 2026-10-01: "three AI steps draft in different ways, then one writes the final reply" produced a valid graph (three `llm.generate` steps feeding a fourth) and passed its test. That draft is still open on "Gift Wrap Help" (proposal `4e50bbfd-b747-47c3-b236-2694de593d13`). Not checked: whether the three steps run at the same time or one after another.
+- Not built: "Review draft" on the unanswered-topic suggestions (it could now prefill this flow), changing the topic after saving.
 
 ### Later (ask the owner first)
 - Create a brand-new workflow from a prompt. Routing decision needed: how a new workflow gets matched (keywords in `filters.keywords`, a new classifier intent, or an LLM router). A subscription with no filter would catch every message, so it must never ship without one.

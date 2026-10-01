@@ -34,9 +34,24 @@ function statusChip(workflow: StudioWorkflow) {
 
 function WorkflowCard({ workflow, onChanged }: { workflow: StudioWorkflow; onChanged: () => void }) {
   const [switching, setSwitching] = useState(false);
-  const toggle = () => {
+  const [keywords, setKeywords] = useState<string | null>(null); // null = not editing
+  const [error, setError] = useState<string | null>(null);
+  const run = (action: Promise<unknown>, fallback: string) => {
     setSwitching(true);
-    studioApi.setWorkflowEnabled(workflow.id, !workflow.enabled).then(onChanged).catch(() => {}).finally(() => setSwitching(false));
+    setError(null);
+    action.then(onChanged).catch((err) => setError(apiErrorMessage(err, fallback))).finally(() => setSwitching(false));
+  };
+  const toggle = () => run(studioApi.setWorkflowEnabled(workflow.id, !workflow.enabled), "Could not change this workflow.");
+  const saveKeywords = (event: React.FormEvent) => {
+    event.preventDefault();
+    const list = (keywords ?? "").split(",").map((word) => word.trim()).filter(Boolean);
+    if (!list.length) return;
+    run(studioApi.setWorkflowKeywords(workflow.id, list).then(() => setKeywords(null)), "Could not save the keywords.");
+  };
+  const remove = () => {
+    if (window.confirm(`Delete "${workflow.name}"? This can't be undone.`)) {
+      run(studioApi.deleteWorkflow(workflow.id), "Could not delete this workflow.");
+    }
   };
   const answeredRate = workflow.runs_7d ? Math.round((workflow.answered_7d / workflow.runs_7d) * 100) : null;
 
@@ -50,11 +65,30 @@ function WorkflowCard({ workflow, onChanged }: { workflow: StudioWorkflow; onCha
         {workflow.description || "No description yet."}
         {workflow.dispatch_mode === "fallback" ? " Runs when no other workflow matches." : null}
       </p>
-      {workflow.keywords.length ? (
+      {keywords !== null ? (
+        <form onSubmit={saveKeywords} className="mt-2 flex flex-wrap items-center gap-2">
+          <label htmlFor={`keywords-${workflow.id}`} className="sr-only">Keywords, separated by commas</label>
+          <input
+            id={`keywords-${workflow.id}`}
+            value={keywords}
+            onChange={(e) => setKeywords(e.target.value)}
+            placeholder="gift wrap, gift note"
+            className="h-8 min-w-0 flex-1 rounded-control border border-border bg-surface px-2 text-[13px] text-foreground"
+          />
+          <Button type="submit" size="sm" disabled={switching || !keywords.trim()}>Save</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => setKeywords(null)}>Cancel</Button>
+        </form>
+      ) : workflow.keywords.length ? (
         <p className="mt-1.5 text-[12.5px] leading-5 text-text-secondary">
           Runs when a message contains: <span className="text-foreground">{workflow.keywords.join(", ")}</span>
+          {workflow.can_toggle ? (
+            <button type="button" onClick={() => setKeywords(workflow.keywords.join(", "))} className="ml-2 font-medium text-primary hover:underline">
+              Edit keywords
+            </button>
+          ) : null}
         </p>
       ) : null}
+      {error ? <p role="alert" className="mt-1.5 text-[12.5px] text-danger">{error}</p> : null}
       <div className="mb-4 mt-3">
         <MiniGraph graph={workflow.graph} />
       </div>
@@ -76,13 +110,16 @@ function WorkflowCard({ workflow, onChanged }: { workflow: StudioWorkflow; onCha
           ) : null}
           <span> · edited {formatShortAgo(workflow.edited_at)}</span>
         </p>
-        <div className="mt-2 flex gap-4 font-medium">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-medium">
           <Link href={`/app/workflows/edit/${workflow.id}`} className="text-primary hover:underline">Edit steps</Link>
           <Link href={`/app/workflows/history/${workflow.id}`} className="text-primary hover:underline">Version history</Link>
           {workflow.can_toggle ? (
             <button type="button" onClick={toggle} disabled={switching} className="ml-auto text-primary hover:underline disabled:opacity-60">
               {workflow.enabled ? "Turn off" : "Turn on"}
             </button>
+          ) : null}
+          {workflow.can_toggle && !workflow.enabled ? (
+            <button type="button" onClick={remove} disabled={switching} className="text-danger hover:underline disabled:opacity-60">Delete</button>
           ) : null}
         </div>
       </div>
@@ -175,17 +212,18 @@ function AskBar({ workflows, onDraft }: { workflows: StudioWorkflow[]; onDraft: 
   };
 
   return (
-    <form onSubmit={submit} className="rounded-container border border-border bg-surface p-2">
+    <form onSubmit={submit} className="rounded-container border border-ai-accent/50 bg-surface p-3">
+      <p className="mb-2 flex flex-wrap items-center gap-x-2 text-[14px] font-semibold text-foreground">
+        <span className="flex items-center gap-1.5 text-ai-accent"><WandSparkles size={16} aria-hidden /> Ask TCOS</span>
+        <span className="text-[13px] font-normal text-text-secondary">Type what you want. TCOS changes a workflow or builds a new one for you to review.</span>
+      </p>
       <div className="flex flex-col gap-2 md:flex-row md:items-center">
-        <span className="flex shrink-0 items-center gap-1.5 px-2 text-[13.5px] font-semibold text-ai-accent">
-          <WandSparkles size={16} aria-hidden /> Ask TCOS
-        </span>
         <label className="sr-only" htmlFor="ask-workflow">Workflow to change</label>
         <select
           id="ask-workflow"
           value={workflowId}
           onChange={(e) => setWorkflowId(e.target.value)}
-          className="h-9 shrink-0 rounded-control border border-border bg-surface px-2 text-[13px] text-foreground md:max-w-56"
+          className="h-10 shrink-0 rounded-control border border-border bg-surface px-2 text-[13px] text-foreground md:max-w-56"
         >
           {workflows.map((w) => (
             <option key={w.id} value={w.id}>{w.name}</option>
@@ -200,9 +238,9 @@ function AskBar({ workflows, onDraft }: { workflows: StudioWorkflow[]; onDraft: 
           placeholder={workflowId === NEW_WORKFLOW
             ? "Describe the new workflow, e.g. answer questions about gift wrapping from the help articles"
             : "Describe a change, e.g. if a delivery is more than 2 days late, apologise and offer a person"}
-          className="h-9 min-w-0 flex-1 rounded-control px-2 text-[13.5px] text-foreground placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+          className="h-10 min-w-0 flex-1 rounded-control border border-border bg-background px-3 text-[14px] text-foreground placeholder:text-text-secondary focus-visible:border-ai-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai-accent/30"
         />
-        <Button type="submit" size="md" disabled={busy || !workflowId || request.trim().length < 3} className="h-9">
+        <Button type="submit" size="md" disabled={busy || !workflowId || request.trim().length < 3} className="h-10">
           {busy ? <Loader2 size={15} className="mr-1.5 animate-spin" aria-hidden /> : null}
           {busy ? "Drafting…" : "Draft it"}
         </Button>
