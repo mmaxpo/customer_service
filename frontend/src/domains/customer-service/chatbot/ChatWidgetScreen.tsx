@@ -20,6 +20,14 @@ const SELF_SERVICE = [
   { key: "start_return", label: "Start a return", description: "Collects the order number and the reason, then hands it to your team." },
 ] as const;
 
+// Must match LANGUAGES in backend .../runtime/nodes/conversation_history.py.
+const LANGUAGES = [
+  ["en", "English"], ["de", "German"], ["fr", "French"], ["es", "Spanish"], ["it", "Italian"],
+  ["nl", "Dutch"], ["pt", "Portuguese"], ["tr", "Turkish"], ["ar", "Arabic"], ["fa", "Persian"],
+] as const;
+
+type ReplyLanguage = { customer_language: boolean; languages: string[] };
+
 type SelfServiceKey = (typeof SELF_SERVICE)[number]["key"];
 
 type Form = {
@@ -30,6 +38,7 @@ type Form = {
   brand_color: string;
   position: string;
   logo: string | null;
+  reply_language: ReplyLanguage;
   self_service: Record<SelfServiceKey, boolean>;
 };
 
@@ -60,6 +69,7 @@ export default function ChatWidgetScreen() {
           brand_color: settings.brand_color,
           position: settings.position,
           logo: typeof settings.meta?.logo === "string" ? settings.meta.logo : null,
+          reply_language: { customer_language: true, languages: [], ...((settings.meta?.reply_language ?? {}) as Partial<ReplyLanguage>) },
           self_service: {
             track_order: Boolean(chosen.track_order),
             report_problem: Boolean(chosen.report_problem),
@@ -88,8 +98,8 @@ export default function ChatWidgetScreen() {
     setSaving(true);
     setError(null);
     try {
-      const { self_service, logo, ...look } = form;
-      const nextMeta = { ...meta, self_service, logo };
+      const { self_service, logo, reply_language, ...look } = form;
+      const nextMeta = { ...meta, self_service, logo, reply_language };
       await updateChatWidgetSettings({ ...look, meta: nextMeta });
       setMeta(nextMeta);
       setStatus("Saved.");
@@ -180,6 +190,48 @@ export default function ChatWidgetScreen() {
           </div>
           <label className={`${labelClass} sm:col-span-2`}>Greeting<Textarea className="mt-1 font-normal" value={form.welcome_message} onChange={(e) => set({ welcome_message: e.target.value })} required /></label>
         </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Language</h2>
+        <label className="mt-2.5 flex items-start gap-3">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={form.reply_language.customer_language}
+            onChange={(e) => set({ reply_language: { ...form.reply_language, customer_language: e.target.checked } })}
+            className="mt-0.5 h-4 w-4"
+          />
+          <span>
+            <span className="block text-sm font-medium text-foreground">Reply in the customer's language</span>
+            <span className="block text-[13px] text-text-secondary">When off, automated replies are always in your workspace language.</span>
+          </span>
+        </label>
+        {form.reply_language.customer_language ? (
+          <fieldset className="mt-3">
+            <legend className="text-[13px] text-text-secondary">Only these languages (none selected means any language):</legend>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+              {LANGUAGES.map(([code, name]) => (
+                <label key={code} className="flex items-center gap-1.5 text-[13px] text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={form.reply_language.languages.includes(code)}
+                    onChange={(e) => set({
+                      reply_language: {
+                        ...form.reply_language,
+                        languages: e.target.checked
+                          ? [...form.reply_language.languages, code]
+                          : form.reply_language.languages.filter((item) => item !== code),
+                      },
+                    })}
+                    className="h-4 w-4"
+                  />
+                  {name}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
       </section>
 
       <section>

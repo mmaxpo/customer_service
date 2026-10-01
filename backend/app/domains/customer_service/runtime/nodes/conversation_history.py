@@ -5,6 +5,10 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+
+from app.domains.customer_service.models import CustomerChatWidgetSettings
+from app.tenancy.models import Workspace
 
 from app.domains.customer_service.repositories.conversations import (
     ConversationRepository,
@@ -15,6 +19,30 @@ from app.domains.customer_service.services.ai_context_policy import (
 
 _SPEAKERS = {"customer": "Customer", "ai": "Assistant", "agent": "Team member"}
 _ORDER_REF = re.compile(r"#\s*(\d{3,20})\b")
+
+LANGUAGES = {
+    "en": "English", "de": "German", "fr": "French", "es": "Spanish", "it": "Italian",
+    "nl": "Dutch", "pt": "Portuguese", "tr": "Turkish", "ar": "Arabic", "fa": "Persian",
+}
+
+
+def reply_language_rule(setting: dict | None, default_locale: str | None) -> str:
+    """The language instruction for reply prompts, from Settings → Chat widget.
+    With no setting saved, replies follow the customer's language."""
+    setting = setting or {}
+    default = LANGUAGES.get((default_locale or "en").split("-")[0].lower(), "English")
+    if setting.get("customer_language") is False:
+        return f"Write the reply in {default}, whatever language the customer writes in."
+    allowed = [LANGUAGES[code] for code in setting.get("languages") or [] if code in LANGUAGES]
+    if allowed:
+        return (
+            "Write the reply in the language of the customer message above if it is one of: "
+            f"{', '.join(allowed)}. Otherwise write the reply in {default}."
+        )
+    return (
+        "Write the reply in the language of the customer message above: English for "
+        "an English message, German for a German message, and so on."
+    )
 
 
 class LoadConversationConfig(BaseModel):
@@ -84,12 +112,26 @@ class LoadConversationNode:
         if conversation_id and lines:
             history = CustomerServiceAIContextPolicy.from_env().trim_text(history)
 
+        widget_meta, default_locale = None, None
+        if ctx.db is not None:
+            widget_meta = await ctx.db.scalar(
+                select(CustomerChatWidgetSettings.meta).where(
+                    CustomerChatWidgetSettings.user_id == ctx.user_id
+                )
+            )
+            default_locale = await ctx.db.scalar(
+                select(Workspace.default_locale).where(Workspace.id == ctx.user_id)
+            )
+
         return {
             "output": history,
             "patch": {
                 "vars": {
                     config.save_as: history or "(no earlier messages)",
                     "conversation_order_ref": order_ref,
+                    "reply_language_rule": reply_language_rule(
+                        (widget_meta or {}).get("reply_language"), default_locale
+                    ),
                 },
             },
             "meta": {"messages": len(lines), "order_ref": order_ref},

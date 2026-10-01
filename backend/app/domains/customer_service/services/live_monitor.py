@@ -50,7 +50,9 @@ def plain_reason(problem: str | None) -> str | None:
     if not problem:
         return None
     lowered = problem.lower()
-    if "llm" in lowered or "openai" in lowered or problem == "handoff":
+    if problem == "handoff":
+        return "The automation passed this conversation to your team."
+    if "llm" in lowered or "openai" in lowered:
         return "The AI provider isn't responding, so the customer got the standby reply."
     if "no enabled provider binding" in lowered and "orders" in lowered:
         return "Order lookup isn't set up for this store."

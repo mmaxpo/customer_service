@@ -10,6 +10,7 @@ import { Input } from "@/ui/primitives/input";
 import { Textarea } from "@/ui/primitives/textarea";
 import { ProductNotice, ProductPanel, ProductStatCard } from "@/ui/product";
 import { ApiError, knowledgeApi } from "@/platform/api";
+import { UnansweredTopics } from "@/domains/customer-service/automation/UnansweredTopics";
 
 type KBDocRow = {
   doc_id: string;
@@ -165,6 +166,8 @@ export default function KnowledgePage() {
         />
         <ProductStatCard label="AI ready" value={docs.length > 0 ? "Yes" : "No"} icon={Sparkles} />
       </div>
+
+      <UnansweredTopics title="Questions your help articles don't answer" />
 
       <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
         <ProductPanel

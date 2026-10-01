@@ -17,6 +17,9 @@ from app.domains.customer_service.services.conversation_translation import (
 )
 from app.domains.customer_service.services.desk_insights import DeskInsightsService
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
+from app.domains.customer_service.services.unanswered_topics import (
+    UnansweredTopicsService,
+)
 
 studio_router = APIRouter(tags=["Customer Service - Automation Studio"])
 
@@ -38,6 +41,29 @@ async def translate_conversation(
 ):
     return await ConversationTranslationService(db).translate(
         workspace_id=current_user.id, conversation_id=conversation_id
+    )
+
+
+class TopicDismiss(BaseModel):
+    topic: str = Field(min_length=1, max_length=120)
+
+
+@studio_router.get("/unanswered-topics")
+async def unanswered_topics(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await UnansweredTopicsService(db).topics(workspace_id=current_user.id)
+
+
+@studio_router.post("/unanswered-topics/dismiss")
+async def dismiss_unanswered_topic(
+    payload: TopicDismiss,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await UnansweredTopicsService(db).dismiss(
+        workspace_id=current_user.id, topic=payload.topic
     )
 
 

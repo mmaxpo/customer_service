@@ -70,7 +70,7 @@ Built on 2026-10-01 (all verified live through the public chat API, 14/14 correc
 
 Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
-Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget as `a8af91bb`; the logo and reply target as `aa6aa0e9`; the sales tile as `87c775e2`; the translation row is **not committed yet**, ask the owner):
+Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget as `a8af91bb`; the logo and reply target as `aa6aa0e9`; the sales tile as `87c775e2`; the Inbox translation as `56e90a66`; the language switch and unanswered-topics rows are **not committed yet**, ask the owner):
 
 | Behaviour | Where |
 |---|---|
@@ -87,6 +87,9 @@ Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3
 | Target shown in the app: each waiting conversation gets `reply_due_at` and `target_state` (`on_track` / `close` = last quarter of the allowed time / `missed`), counted in business hours from the customer's last message. Live → Now and the Inbox list show "Reply due in X min" or "Reply target missed"; Desk → Speed shows "Answered within target" (first reply by bot or person; unanswered past due counts as late) | `_waiting_for_person` in `live_monitor.py`, `_speed` in `desk_insights.py`, `live/ReplyTargetChip.tsx`, `LiveNowScreen.tsx`, `InboxQueue.tsx`, `DeskReports.tsx` |
 | Desk → Automation tile "Orders after a support chat: N · $X": Shopify orders (not cancelled) created within 3 days after a customer message, matched by the customer's email, for the chosen period. Read live from Shopify on each Desk load (about 1.5 s); the tile is hidden when Shopify isn't connected or the call fails. The local `cs_shopify_order_cache` only holds orders someone looked up, so it can't be used for this | `_sales_after_support` in `desk_insights.py`, `list_orders_since` in `services/shopify.py` and `integrations/shopify/real_provider.py`, `AutomationReport` in `DeskReports.tsx` |
 | Inbox "Translate conversation" (in the Case activity bar): one AI call translates the last 20 customer, bot and team messages into the workspace language and shows each translation under its message, with "Customer wrote in German · translated" (or "no translation needed"). Nothing is stored. The bot already replies in the customer's language: the v22 prompts end with that rule (checked live with a German question) | `backend/app/domains/customer_service/services/conversation_translation.py`, `POST /studio/conversations/{id}/translate` in `studio.py`, `inbox/case/CaseTimeline.tsx` |
+| Language switch (**not live yet**): Settings → Chat widget → Language has "Reply in the customer's language" and an optional list of allowed languages, stored in the widget settings under `meta.reply_language`. The "Remember the conversation" step now sets `vars.reply_language_rule` from it. v22's prompts still hard-code "reply in the customer's language", so the switch only takes effect after (1) the worker is restarted and (2) a new version is published whose two reply prompts end with `{{vars.reply_language_rule}}` instead of that sentence. The new version could not be drafted because an older draft is open on the workflow (proposal `3fa7e833-0954-404a-b2d6-f365b7b5d9cb`, request "In the Generate general reply step: yes we do"); ask the owner before discarding it | `ChatWidgetScreen.tsx`; `reply_language_rule` in `backend/app/domains/customer_service/runtime/nodes/conversation_history.py` |
+| Unanswered-topic suggestions: "Questions your workflows don't answer yet" on Automations and "Questions your help articles don't answer" on Knowledge. One AI call groups the last 7 days of customer messages the automation handed to the team (provider outages excluded); topics with 3+ messages are listed with examples and a Dismiss button. No "Review draft" yet (needs create-from-prompt). The result is cached for 6 hours, with the dismissed topics, in the widget settings under `meta.unanswered_topics` (no new table) | `backend/app/domains/customer_service/services/unanswered_topics.py`, `GET /studio/unanswered-topics`, `POST /studio/unanswered-topics/dismiss`, `automation/UnansweredTopics.tsx`, `WorkflowsScreen.tsx`, `app/knowledge/page.tsx` |
+| Live wording fix: a normal bot hand-over was labelled "The AI provider isn't responding…"; it now reads "The automation passed this conversation to your team." Real provider failures keep the old text | `plain_reason` in `live_monitor.py` |
 
 Work up to v22 is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
@@ -153,10 +156,12 @@ Settings → Workspace: "First reply within X, during business hours" plus the w
 Original task: Sales influenced by support
 Desk: "Orders placed within 3 days after a support chat: N · $X" from Shopify order data matched to the chat's customer. Check what order data is stored locally before calling Shopify.
 
-### Task 9: NEXT (needs Task 10's create-from-prompt for "Review draft", or the owner's call). Unanswered-topic suggestions (uses AI)
+### Task 9: DONE except "Review draft" (see section 2)
+
+Original task: Unanswered-topic suggestions (uses AI)
 Cluster customer messages from the last 7 days that no workflow answered (outcome handed over / no workflow). At 3+ in a cluster, show a card above the workflows ("Customers asked about gift wrapping 18 times this week") with Review draft / Dismiss, and "Questions your help articles don't answer" on the Knowledge page. "Review draft" needs Task 10's create-from-prompt, so either do Task 10 first or ask the owner.
 
-### Task 10: PARTLY DONE (see section 2). Open: the Settings switch "Reply in the customer's language" + supported languages. The bot always replies in the customer's language today; a switch needs the prompt's last line to come from a setting, which means publishing a new workflow version (owner's yes) and a worker restart.
+### Task 10: DONE except making the switch live (see the "Language switch" row in section 2: needs the open draft resolved, a published v23 and a worker restart).
 
 Original task: Answers in the customer's language (uses AI)
 Settings → Workspace: "Reply in the customer's language" + supported languages. `cs_conversation_insights.language` already detects language. In the inbox, show "Customer wrote in German · translated" with a translation for the team.
@@ -168,6 +173,9 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 ---
 
 ## 4. Known gaps worth remembering
+- Saving the Chat widget tab sends back the whole `meta` it loaded, so a tab left open for a long time can overwrite newer `unanswered_topics` (cached topics, dismissals). Worth moving those to their own table if this grows.
+- Live → "Problems in the last 24 hours" still lists normal hand-overs as a problem row (now with the correct wording).
+- "shipping information" was dismissed in the dev workspace while testing Task 9.
 - `cs_conversation_insights.language` is rule-based and only knows en / es / fr / fa / ar (German is stored as `en`), so the Inbox can't flag a foreign-language chat by itself; the team clicks "Translate conversation". The fixed replies (hand-off, self-service, standby) are always English.
 - The "Newest activity below" hint in the Case activity bar was replaced by the Translate control.
 - Test conversation "Lena Test" (`187e9e7b-29e5-4328-8ca1-a3c0ef5aa0ef`) is a German chat created on 2026-10-01 for this check.

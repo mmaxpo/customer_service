@@ -10,6 +10,7 @@ import { Button } from "@/ui/primitives/button";
 
 import { formatShortAgo } from "../inbox/case/format";
 import { ToneChip } from "../inbox/case/parts";
+import { UnansweredTopics } from "./UnansweredTopics";
 import { AutomationHeader } from "./AutomationHeader";
 import { MiniGraph } from "./WorkflowGraph";
 import { studioApi, type StudioOverview, type StudioWorkflow } from "./api";
@@ -177,6 +178,8 @@ export default function WorkflowsScreen() {
           </div>
 
           {data.workflows.length ? <AskBar workflows={data.workflows} /> : null}
+
+          <UnansweredTopics title="Questions your workflows don't answer yet" />
 
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.workflows.map((workflow) => (
