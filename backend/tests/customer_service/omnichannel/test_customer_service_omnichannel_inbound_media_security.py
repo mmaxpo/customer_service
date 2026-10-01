@@ -68,6 +68,10 @@ async def _create_product_graph(
         UserCreate(
             email=f"media-security-{label}-{uuid4()}@example.com",
             password=f"Media-Security-{label}-{uuid4()}",
+            terms_accepted=True,
+            terms_version="v1",
+            privacy_accepted=True,
+            privacy_version="v1",
         ),
         db,
     )

@@ -14,6 +14,7 @@ from app.identity import create_user
 from app.main import app
 from app.models.models import User as UserORM
 from app.models.schemas import UserCreate
+from app.tenancy.repository import WorkspaceRepository
 from app.tenancy.schemas import WorkspaceCreate, WorkspaceInvitationCreate
 from app.tenancy.service import WorkspaceService
 
@@ -111,16 +112,15 @@ async def test_workspace_members_share_customer_service_tenant_data():
             user_id=agent.id,
             user_email=agent.email,
         )
-        _, viewer_token = await service.create_invitation(
+        # Viewers can no longer be invited (V1), but existing viewer members
+        # must keep working, so this one is added directly.
+        await WorkspaceRepository(db).add_membership(
             workspace_id=workspace.id,
-            actor_user_id=owner.id,
-            payload=WorkspaceInvitationCreate(email=viewer.email, role="viewer"),
-        )
-        await service.accept_invitation(
-            token=viewer_token,
             user_id=viewer.id,
-            user_email=viewer.email,
+            role="viewer",
+            invited_by_user_id=owner.id,
         )
+        await db.commit()
 
     await _mark_users_verified(
         owner,

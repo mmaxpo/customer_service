@@ -26,6 +26,7 @@ from app.domains.customer_service.schemas.customers import (
 )
 from app.domains.customer_service.security.rbac import (
     get_customer_service_principal as get_current_user,
+    require_customer_service_permission,
 )
 from app.domains.customer_service.services.customer_360 import Customer360Service
 from app.domains.customer_service.services.customer_activity import (
@@ -42,7 +43,7 @@ customers_router = APIRouter(tags=["Customer Service - Customers"])
 async def create_customer(
     payload: CustomerCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_customer_service_permission("cs.customers.manage")),
 ):
     try:
         return await CustomerService(db).create_customer(

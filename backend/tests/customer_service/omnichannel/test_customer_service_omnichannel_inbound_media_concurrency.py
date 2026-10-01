@@ -131,6 +131,10 @@ async def test_duplicate_media_materialization_is_serialized_and_fetches_once(
             UserCreate(
                 email=(f"media-concurrency-{uuid4()}@example.com"),
                 password=(f"Media-Concurrency-{uuid4()}"),
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             setup_db,
         )

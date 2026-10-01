@@ -348,7 +348,9 @@ async def test_workspace_settings_changes_are_audited_and_metadata_is_pure_read(
             (
                 await db.scalars(
                     select(WorkspaceSettingsAuditLog).where(
-                        WorkspaceSettingsAuditLog.workspace_id == workspace.id
+                        WorkspaceSettingsAuditLog.workspace_id == workspace.id,
+                        # The table also holds lifecycle entries (invitations).
+                        WorkspaceSettingsAuditLog.action == "workspace.settings_updated",
                     )
                 )
             ).all()
@@ -389,7 +391,8 @@ async def test_workspace_settings_changes_are_audited_and_metadata_is_pure_read(
         assert (
             await db.scalar(
                 select(func.count(WorkspaceSettingsAuditLog.id)).where(
-                    WorkspaceSettingsAuditLog.workspace_id == workspace.id
+                    WorkspaceSettingsAuditLog.workspace_id == workspace.id,
+                    WorkspaceSettingsAuditLog.action == "workspace.settings_updated",
                 )
             )
             == 1
@@ -403,6 +406,10 @@ async def test_workspace_settings_changes_are_audited_and_metadata_is_pure_read(
         audit_logs = await service.list_workspace_settings_audit_logs(
             workspace_id=workspace.id, user_id=owner.id, limit=10, offset=0
         )
+        # The audit trail also lists lifecycle entries (the invitation above).
+        audit_logs = [
+            log for log in audit_logs if log.action == "workspace.settings_updated"
+        ]
         assert len(audit_logs) == 2
         assert audit_logs[0].changes == {
             "changes": {
@@ -640,7 +647,7 @@ async def test_invitation_resend_revoke_and_team_roster():
         revoke_invitation, revoke_token = await service.create_invitation(
             workspace_id=workspace.id,
             actor_user_id=owner.id,
-            payload=WorkspaceInvitationCreate(email=revoked_email, role=WorkspaceRole.VIEWER),
+            payload=WorkspaceInvitationCreate(email=revoked_email, role=WorkspaceRole.AGENT),
         )
         revoked = await service.revoke_invitation(
             workspace_id=workspace.id,
@@ -732,7 +739,7 @@ async def test_invitation_resend_revoke_and_team_roster():
         removed_invitation, removed_token = await service.create_invitation(
             workspace_id=workspace.id,
             actor_user_id=owner.id,
-            payload=WorkspaceInvitationCreate(email=removed_email, role=WorkspaceRole.VIEWER),
+            payload=WorkspaceInvitationCreate(email=removed_email, role=WorkspaceRole.AGENT),
         )
         await service.accept_invitation(
             token=removed_token, user_id=removed_user.id, user_email=removed_email
@@ -759,7 +766,7 @@ async def test_invitation_resend_revoke_and_team_roster():
             workspace_id=workspace.id,
             actor_user_id=owner.id,
             payload=WorkspaceInvitationCreate(
-                email=f"invite-pending-{suffix}@example.com", role=WorkspaceRole.VIEWER
+                email=f"invite-pending-{suffix}@example.com", role=WorkspaceRole.AGENT
             ),
         )
         expired_token = "expired-" + uuid4().hex + uuid4().hex

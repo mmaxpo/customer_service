@@ -8,6 +8,19 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 
 
+class _AllowSignups:
+    async def increment(self, *args, **kwargs) -> int:
+        return 0
+
+
+@pytest.fixture(autouse=True)
+def _no_signup_rate_limit(monkeypatch):
+    # These tests sign up from one address; the limiter is covered elsewhere.
+    from app.api import auth as auth_api
+
+    monkeypatch.setattr(auth_api, "_signup_rate_store", _AllowSignups())
+
+
 async def _authenticated_client() -> AsyncClient:
     client = AsyncClient(
         transport=ASGITransport(app=app),
@@ -22,6 +35,10 @@ async def _authenticated_client() -> AsyncClient:
         json={
             "email": email,
             "password": password,
+            "terms_accepted": True,
+            "terms_version": "v1",
+            "privacy_accepted": True,
+            "privacy_version": "v1",
         },
     )
     assert signup.status_code == 201

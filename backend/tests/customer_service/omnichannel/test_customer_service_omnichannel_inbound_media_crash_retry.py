@@ -144,6 +144,10 @@ async def test_media_link_failure_rolls_back_db_and_retry_reuses_storage(
             UserCreate(
                 email=f"media-crash-{uuid4()}@example.com",
                 password=f"Media-Crash-{uuid4()}",
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             db,
         )

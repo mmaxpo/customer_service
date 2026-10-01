@@ -12,6 +12,7 @@ from app.identity import create_user
 from app.main import app
 from app.models.models import User
 from app.models.schemas import UserCreate
+from app.tenancy.repository import WorkspaceRepository
 from app.tenancy.schemas import WorkspaceCreate, WorkspaceInvitationCreate
 from app.tenancy.service import WorkspaceService
 
@@ -157,8 +158,19 @@ async def test_workspace_profile_http_read_update_and_authorization():
             "kind": "organization",
             "status": "active",
             "business_name": None,
-            "timezone": None,
-            "business_hours": None,
+            "timezone": "UTC",
+            "business_hours": {
+                "mode": "24_7",
+                "weekly_hours": {},
+                "holidays": [],
+                "out_of_hours": {
+                    "widget_state": "away",
+                    "auto_reply_enabled": False,
+                    "auto_reply_text": None,
+                },
+            },
+            "deletion_requested_at": None,
+            "deletion_scheduled_for": None,
             "created_by_user_id": str(owner.id),
             "created_at": read_response.json()["created_at"],
             "updated_at": read_response.json()["updated_at"],
@@ -246,7 +258,6 @@ async def test_invitation_management_http_authorization_and_tenant_isolation(mon
         for user, role in (
             (admin, WorkspaceRole.ADMIN),
             (agent_member, WorkspaceRole.AGENT),
-            (viewer_member, WorkspaceRole.VIEWER),
         ):
             _, token = await service.create_invitation(
                 workspace_id=workspace.id,
@@ -256,6 +267,16 @@ async def test_invitation_management_http_authorization_and_tenant_isolation(mon
             await service.accept_invitation(
                 token=token, user_id=user.id, user_email=user.email
             )
+
+        # Viewers can no longer be invited (V1), but existing viewer members
+        # must keep working, so this one is added directly.
+        await WorkspaceRepository(db).add_membership(
+            workspace_id=workspace.id,
+            user_id=viewer_member.id,
+            role=WorkspaceRole.VIEWER.value,
+            invited_by_user_id=owner.id,
+        )
+        await db.commit()
 
         other_invitation, _ = await service.create_invitation(
             workspace_id=other_workspace.id,

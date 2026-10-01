@@ -49,6 +49,10 @@ async def test_external_media_link_is_idempotent_and_attachment_can_flush(
             UserCreate(
                 email=f"external-media-{uuid4()}@example.com",
                 password=f"External-Media-{uuid4()}",
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             db,
         )
@@ -191,6 +195,10 @@ async def test_attachment_commit_false_does_not_commit_outer_transaction(
             UserCreate(
                 email=f"external-media-rollback-{uuid4()}@example.com",
                 password=f"External-Media-Rollback-{uuid4()}",
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             db,
         )

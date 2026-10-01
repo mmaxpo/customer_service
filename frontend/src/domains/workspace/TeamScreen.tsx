@@ -104,7 +104,7 @@ export default function TeamScreen() {
         <ul className="mt-2.5 divide-y divide-border border-y border-border">
           {team.map((member) => {
             const invited = member.state === "invited" || !member.user_id;
-            const suspended = member.state === "suspended";
+            const suspended = member.state === "deactivated";
             return (
               <li key={member.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
                 <div className="min-w-0 flex-1 basis-48">

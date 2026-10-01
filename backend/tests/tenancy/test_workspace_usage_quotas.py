@@ -19,6 +19,10 @@ async def test_workspace_quota_clamps_run_and_records_cost():
             UserCreate(
                 email=f"usage-{uuid4()}@example.com",
                 password=f"Usage-Password-{uuid4()}",
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             db,
         )

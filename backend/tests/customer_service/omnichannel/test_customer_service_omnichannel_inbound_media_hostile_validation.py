@@ -186,6 +186,10 @@ async def test_hostile_fetched_media_dead_letters_without_durable_or_physical_ar
             UserCreate(
                 email=f"media-hostile-{label}-{uuid4()}@example.com",
                 password=f"Media-Hostile-{uuid4()}",
+                terms_accepted=True,
+                terms_version="v1",
+                privacy_accepted=True,
+                privacy_version="v1",
             ),
             db,
         )

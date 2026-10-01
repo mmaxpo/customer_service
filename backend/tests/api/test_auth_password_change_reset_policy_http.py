@@ -252,7 +252,8 @@ async def test_password_change_enforces_shared_policy(
             headers={"authorization": (f"Bearer {login.json()['access_token']}")},
             json={
                 "current_password": password,
-                "new_password": "alllowercasebutlong123",
+                # Long enough, but the policy also needs a number.
+                "new_password": "onlylettersnonumber",
             },
         )
 

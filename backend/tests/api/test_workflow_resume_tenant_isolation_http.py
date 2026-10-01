@@ -13,6 +13,19 @@ from app.runtime.nodes.registry.builtins import (
 from app.runtime.persistence import build_run_store
 
 
+class _AllowSignups:
+    async def increment(self, *args, **kwargs) -> int:
+        return 0
+
+
+@pytest.fixture(autouse=True)
+def _no_signup_rate_limit(monkeypatch):
+    # These tests sign up from one address; the limiter is covered elsewhere.
+    from app.api import auth as auth_api
+
+    monkeypatch.setattr(auth_api, "_signup_rate_store", _AllowSignups())
+
+
 async def _create_authenticated_client():
     client = AsyncClient(
         transport=ASGITransport(app=app),
@@ -27,12 +40,14 @@ async def _create_authenticated_client():
         json={
             "email": email,
             "password": password,
+            "terms_accepted": True,
+            "terms_version": "v1",
+            "privacy_accepted": True,
+            "privacy_version": "v1",
         },
     )
 
     assert signup.status_code == 201
-
-    user_id = signup.json()["id"]
 
     login = await client.post(
         "/auth/login",
@@ -43,6 +58,10 @@ async def _create_authenticated_client():
     )
 
     assert login.status_code == 200
+
+    # Sign-up no longer returns the account (it answers the same for new and
+    # existing emails), so the id comes from the signed-in session.
+    user_id = (await client.get("/auth/me")).json()["id"]
 
     return client, user_id
 

@@ -582,11 +582,12 @@ class WorkspaceService:
         workspace_id: UUID,
         user_id: UUID,
     ) -> list[dict]:
-        _, membership = await self.get_workspace_for_user(
+        # Any active member may see who is on the team; changing it stays
+        # with owners and admins (invite, role and status endpoints).
+        await self.get_workspace_for_user(
             workspace_id=workspace_id,
             user_id=user_id,
         )
-        self._require_team_management(membership)
         now = datetime.now(timezone.utc)
         entries: list[dict] = []
 
