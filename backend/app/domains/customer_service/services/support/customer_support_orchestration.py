@@ -126,7 +126,7 @@ class CustomerSupportOrchestrationService:
                 session_id=session.id,
                 content=(
                     "I still need the order number to continue this "
-                    "support request. No Shopify action has been performed."
+                    "request. Nothing on your order has been changed."
                 ),
             )
 
@@ -457,9 +457,8 @@ class CustomerSupportOrchestrationService:
             assistant_message = await self.chat_service.add_ai_message(
                 session_id=session.id,
                 content=(
-                    "I can help with that support request, but I need "
-                    "the order number first. No Shopify action has been "
-                    "performed."
+                    "I can help with that. What is your order number? "
+                    "Nothing on your order has been changed."
                 ),
             )
 
@@ -780,7 +779,7 @@ class CustomerSupportOrchestrationService:
         return (
             "I still need "
             + ", ".join(remaining)
-            + ". No Shopify action has been performed."
+            + ". Nothing on your order has been changed."
         )
 
     @staticmethod
@@ -820,8 +819,8 @@ class CustomerSupportOrchestrationService:
             f"I have confirmed the request to refund "
             f"{refund_label}, replace {replacement_label}, "
             f"and send the replacement to {address}. "
-            "The request is ready for human review. "
-            "No Shopify action has been performed."
+            "Our team will review it and reply here. "
+            "Nothing on your order has been changed yet."
         )
 
 

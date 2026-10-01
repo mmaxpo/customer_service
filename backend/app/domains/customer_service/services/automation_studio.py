@@ -231,6 +231,10 @@ Rules:
   {{input}} for the customer's message and {{vars.<key>}} for a value an
   earlier step saved (a list is inserted whole). No loops, conditions or
   helpers such as {{#each}} or {{#if}}.
+- A prompt that may tell the customer a person will follow up (the question
+  isn't covered, or the customer asks for a human) must instruct the model to
+  end that reply with [HANDOFF]. The marker is hidden from the customer and
+  flags the case for the team.
 Return ONLY JSON: {"workflow": {...}, "summary": [{"kind": "new"|"changed"|"same",
 "text": "<one plain sentence a shop owner understands>"}]}.
 Summary: one line per new or changed step, then one "same" line about what
@@ -727,7 +731,9 @@ class AutomationStudioService:
         return {
             "status": meta.get("status"),
             "error": meta.get("error"),
-            "answer": answer if isinstance(answer, str) else None,
+            # The customer never sees the hand-off marker, so the preview hides it too.
+            "answer": answer.replace("[HANDOFF]", "").strip() if isinstance(answer, str) else None,
+            "handed_over": isinstance(answer, str) and "[HANDOFF]" in answer,
             "fallback_used": any((m or {}).get("handoff_required") for m in node_meta.values()),
             "blocked_steps": [
                 (nodes.get(item["node_id"]) or {}).get("data", {}).get("label")

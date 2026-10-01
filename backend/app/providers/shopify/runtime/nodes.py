@@ -51,6 +51,11 @@ class ShopifyGetOrderNode:
             },
         )
 
+        refusal = _chat_order_refusal(ctx, vars_, output, order_ref)
+
+        if refusal:
+            output = _unverified_order(order_ref, refusal)
+
         return {
             "output": output,
             "patch": {
@@ -64,8 +69,63 @@ class ShopifyGetOrderNode:
                 "order_ref": order_ref,
                 "order_id": output.get("order_id"),
                 "order_name": output.get("order_name"),
+                "email_verified": refusal is None,
+                # No email on the order: only a person can confirm who owns it.
+                **({"handoff_required": True} if refusal and "team member" in refusal else {}),
             },
         }
+
+
+def _chat_order_refusal(
+    ctx, vars_: dict[str, Any], output: dict[str, Any], order_ref: str
+) -> str | None:
+    """In a customer chat, share an order only with the email it was placed with:
+    the email the chat started with, or one the customer typed in this message.
+    Returns what to tell the customer when the order can't be shared."""
+    event_payload = ((getattr(ctx, "extras", None) or {}).get("event") or {}).get(
+        "payload"
+    ) or {}
+
+    if not event_payload.get("session_id") or not output.get("order_id"):
+        return None
+
+    order_email = str(output.get("customer_email") or "").strip().lower()
+
+    if not order_email:
+        return (
+            f"I can't confirm automatically that order {order_ref} belongs to you. "
+            "A team member will check and reply here."
+        )
+
+    chat_email = str(event_payload.get("customer_email") or "").strip().lower()
+
+    if chat_email == order_email or order_email in str(vars_.get("input") or "").lower():
+        return None
+
+    return (
+        f"To protect your order details, I can only share order {order_ref} "
+        "with the email address it was placed with. Please reply with the "
+        "order number and that email address."
+    )
+
+
+def _unverified_order(order_ref: str, note: str) -> dict[str, Any]:
+    return {
+        "found": False,
+        "order_ref": order_ref,
+        "order_name": None,
+        "order_id": None,
+        "customer_email": None,
+        "context": None,
+        "payload": None,
+        "summary": {
+            "found": False,
+            "order_ref": order_ref,
+            "order_name": order_ref,
+            "available_actions": {},
+            "customer_safe_note": note,
+        },
+    }
 
 
 class ShopifyOrderActionConfig(BaseModel):

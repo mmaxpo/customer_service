@@ -1,3 +1,5 @@
+import HandoffNotice from "@/domains/customer-service/live/HandoffNotice";
+
 import AppHeader from "./AppHeader";
 import AppMain from "./AppMain";
 import AppRail from "./AppRail";
@@ -12,6 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <AppHeader />
         <AppMain>{children}</AppMain>
         <MobileNav />
+        <HandoffNotice />
       </div>
     </div>
   );

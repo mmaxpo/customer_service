@@ -403,6 +403,7 @@ async def create_public_message(
                 str(inbox_message.id) if inbox_message is not None else None
             ),
             "visitor_id": session.visitor_id,
+            "customer_email": session.customer_email,
             "channel": session.channel,
             "body": message.content,
             "role": message.role,
@@ -460,8 +461,8 @@ async def create_public_message(
         handoff_message = await service.add_ai_message(
             session_id=session.id,
             content=(
-                "I can help with that request. A support agent will review it "
-                "before any Shopify action is taken. No Shopify action has been performed."
+                "Thanks. I've passed your request to our team. They'll review it "
+                "and reply here. Nothing on your order has been changed yet."
             ),
         )
         await service.add_inbox_ai_message_for_chat_session(

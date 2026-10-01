@@ -964,7 +964,7 @@ async def test_pending_complex_objective_resumes_from_customer_clarification(
             review_confirmations = [
                 message["content"]
                 for message in assistant_messages
-                if ("ready for human review" in message["content"].lower())
+                if ("our team will review it" in message["content"].lower())
             ]
 
             assert len(review_confirmations) == 1
@@ -974,7 +974,7 @@ async def test_pending_complex_objective_resumes_from_customer_clarification(
             assert "Snowboard" in confirmation
             assert "Snowboard Boots" in confirmation
             assert "123 Main Street, Miami, FL 33101" in confirmation
-            assert "No Shopify action has been performed" in confirmation
+            assert "Nothing on your order has been changed yet" in confirmation
 
             expected_outcome_message = (
                 "Your support request for order #1003 was approved. "
@@ -1165,7 +1165,7 @@ async def test_partial_clarification_preserves_progress_and_asks_only_remaining_
             assert "which item should be replaced" in reply
             assert "replacement shipping address" in reply
             assert "which item should be refunded" not in reply
-            assert "no shopify action has been performed" in reply
+            assert "nothing on your order has been changed" in reply
 
             assert body["workflow_dispatch"]["enqueued"] == []
     finally:
@@ -1345,7 +1345,7 @@ async def test_clarification_retry_replays_without_duplicate_resolution(
                 item
                 for item in messages.json()
                 if item["role"] == "assistant"
-                and "ready for human review" in item["content"].lower()
+                and "our team will review it" in item["content"].lower()
             ]
 
             assert len(customer_clarifications) == 1

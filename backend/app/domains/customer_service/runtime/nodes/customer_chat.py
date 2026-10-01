@@ -9,6 +9,11 @@ from app.domains.customer_service.repositories.chat_repository import ChatReposi
 from app.domains.customer_service.services.chat_service import CustomerChatService
 
 
+# A reply step's text ends with this marker when the automation promised that a
+# person will follow up. The customer never sees it; the case is flagged for the team.
+HANDOFF_MARKER = "[HANDOFF]"
+
+
 class CustomerChatReplyConfig(BaseModel):
     node_type: Literal["reply.customer_chat"] = "reply.customer_chat"
 
@@ -69,6 +74,9 @@ class CustomerChatReplyNode:
         message = str(message or "").strip()
         if not message:
             message = _fallback_customer_chat_message(state)
+
+        handoff_required = HANDOFF_MARKER in message
+        message = message.replace(HANDOFF_MARKER, "").strip()
 
         if not message:
             raise ValueError("reply.customer_chat requires a non-empty message")
@@ -131,6 +139,7 @@ class CustomerChatReplyNode:
                 "chat_message_id": str(chat_message.id),
                 "inbox_message_id": output["inbox_message_id"],
                 "idempotency_key": idempotency_key,
+                **({"handoff_required": True} if handoff_required else {}),
             },
         }
 

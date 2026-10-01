@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useApprovals } from "@/domains/customer-service/inbox/features/approvals/hooks";
+import { useWaitingForPerson } from "@/domains/customer-service/live/useWaitingForPerson";
 import { TajeranMark } from "@/ui/brand/TajeranMark";
 import { cn } from "@/platform/utils";
 
@@ -45,6 +46,7 @@ function RailLink({ item, count, compact = false }: { item: NavItem; count?: num
 
 export default function AppRail() {
   const { waits } = useApprovals();
+  const waiting = useWaitingForPerson();
 
   return (
     <nav
@@ -67,7 +69,7 @@ export default function AppRail() {
               <RailLink
                 key={item.href}
                 item={item}
-                count={item.badge === "approvals" ? waits.length : undefined}
+                count={item.badge === "approvals" ? waits.length : item.badge === "waiting" ? waiting?.length : undefined}
               />
             ))}
           </section>

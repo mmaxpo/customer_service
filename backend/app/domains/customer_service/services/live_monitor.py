@@ -163,7 +163,8 @@ class LiveMonitorService:
     async def _waiting_for_person(self, workspace_id: UUID) -> list[dict]:
         # Open conversations where the customer wrote last (ignoring AI replies
         # that handed over), no teammate has replied since, and no automation
-        # answered successfully. A minute's grace lets the automation reply.
+        # answered successfully. A minute's grace lets the automation reply;
+        # a run that handed over shows at once.
         result = await self.db.execute(
             text(
                 f"""
@@ -197,7 +198,7 @@ class LiveMonitorService:
                   LIMIT 1
                 ) run ON true
                 WHERE oc.last_customer_at IS NOT NULL
-                  AND oc.last_customer_at < now() - interval '1 minute'
+                  AND (oc.last_customer_at < now() - interval '1 minute' OR run.problem IS NOT NULL)
                   AND (oc.last_agent_at IS NULL OR oc.last_agent_at < oc.last_customer_at)
                   AND NOT coalesce(run.status = 'done' AND run.problem IS NULL, false)
                 ORDER BY oc.last_customer_at

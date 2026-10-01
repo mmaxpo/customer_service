@@ -15,7 +15,7 @@ export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  badge?: "approvals";
+  badge?: "approvals" | "waiting";
 };
 
 export type NavGroup = {
@@ -35,7 +35,7 @@ export const primaryNav: NavGroup[] = [
   {
     label: "Supervise",
     items: [
-      { href: "/app/live", label: "Live", icon: Activity },
+      { href: "/app/live", label: "Live", icon: Activity, badge: "waiting" },
       { href: "/app/dashboard", label: "Desk", icon: ChartColumn },
     ],
   },
