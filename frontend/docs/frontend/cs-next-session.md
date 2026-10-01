@@ -166,7 +166,7 @@ Cluster customer messages from the last 7 days that no workflow answered (outcom
 Original task: Answers in the customer's language (uses AI)
 Settings → Workspace: "Reply in the customer's language" + supported languages. `cs_conversation_insights.language` already detects language. In the inbox, show "Customer wrote in German · translated" with a translation for the team.
 
-### New workflow from a prompt: DONE (committed as `e233c620`; keyword editing, delete and the clearer Ask bar are **not committed yet**)
+### New workflow from a prompt: DONE (committed as `e233c620`; keyword editing, delete and the clearer Ask bar as `496a0eb5`)
 Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/builder` redirect to `/app/workflows`).
 - Ask bar → "+ New workflow" → TCOS drafts it from a starter graph (`STARTER_WORKFLOW`), names it and proposes keywords and an optional topic. Nothing is saved until **Save**; the draft panel lets the owner edit name, keywords and topic.
 - Save creates a `CustomerServiceEventSubscription` with `workflow_json`, `filters.keywords` (required, so it can never catch every message), optional `filters.intent` (general / shipping / refund), `is_active = false`, `meta.source = "studio_prompt"`. The card shows "Runs when a message contains: …" and a Turn on / Turn off link (only for workflows made this way). Steps are edited with the existing "Edit steps" screen.
@@ -175,7 +175,9 @@ Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/b
 - Verified live: test workflow "Gift Wrap Help" (`5abb161f-e119-44d7-8667-5ccbdc2ff96f`, left switched **off**) answered "Do you offer gift wrapping?" while a shipping question still went to the fallback.
 - Cards of prompt-made workflows have "Edit keywords" and, while switched off, "Delete" (asks for confirmation; removes the `cs_event_subscriptions` row). `POST /studio/workflows/{id}/keywords`, `DELETE /studio/workflows/{id}`; both refuse workflows not made from a prompt.
 - Adding steps: the step editor inserts one step on a connection (no hand-drawn branches). Branching and several AI steps side by side are done by asking TCOS in words. Checked on 2026-10-01: "three AI steps draft in different ways, then one writes the final reply" produced a valid graph (three `llm.generate` steps feeding a fourth) and passed its test. That draft is still open on "Gift Wrap Help" (proposal `4e50bbfd-b747-47c3-b236-2694de593d13`). Not checked: whether the three steps run at the same time or one after another.
-- Not built: "Review draft" on the unanswered-topic suggestions (it could now prefill this flow), changing the topic after saving.
+- "Review draft" on each unanswered-topic suggestion drafts a new workflow for that topic (on Automations directly; from Knowledge via `/app/workflows?new=<request>`, which any page can link to). **Not committed yet.**
+- Idea agreed in principle, not built: in an Inbox conversation that no workflow answered (or that was handed over), a "Build a workflow for this" link that opens the same draft, prefilled from the customer's message. Waiting for the owner's yes.
+- Not built: changing the topic after saving.
 
 ### Later (ask the owner first)
 - Create a brand-new workflow from a prompt. Routing decision needed: how a new workflow gets matched (keywords in `filters.keywords`, a new classifier intent, or an LLM router). A subscription with no filter would catch every message, so it must never ship without one.

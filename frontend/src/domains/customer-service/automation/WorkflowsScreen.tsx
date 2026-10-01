@@ -238,7 +238,7 @@ function AskBar({ workflows, onDraft }: { workflows: StudioWorkflow[]; onDraft: 
           placeholder={workflowId === NEW_WORKFLOW
             ? "Describe the new workflow, e.g. answer questions about gift wrapping from the help articles"
             : "Describe a change, e.g. if a delivery is more than 2 days late, apologise and offer a person"}
-          className="h-10 min-w-0 flex-1 rounded-control border border-border bg-background px-3 text-[14px] text-foreground placeholder:text-text-secondary focus-visible:border-ai-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai-accent/30"
+          className="h-10 min-w-0 shrink-0 rounded-control border border-border bg-background md:flex-1 md:shrink px-3 text-[14px] text-foreground placeholder:text-text-secondary focus-visible:border-ai-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai-accent/30"
         />
         <Button type="submit" size="md" disabled={busy || !workflowId || request.trim().length < 3} className="h-10">
           {busy ? <Loader2 size={15} className="mr-1.5 animate-spin" aria-hidden /> : null}
@@ -260,8 +260,23 @@ export default function WorkflowsScreen() {
   const load = () =>
     studioApi.overview().then(setData).catch((err) => setError(apiErrorMessage(err, "Could not load workflows.")));
 
+  // "Review draft" on a suggestion (here, or from another page via ?new=...).
+  const draftFrom = (request: string) => {
+    setDraft(null);
+    setNotice("TCOS is drafting a workflow for this…");
+    window.scrollTo({ top: 0 });
+    studioApi.draftWorkflow(request)
+      .then((next) => { setDraft(next); setNotice(null); })
+      .catch((err) => setNotice(apiErrorMessage(err, "TCOS could not draft this workflow.")));
+  };
+
   useEffect(() => {
     void load();
+    const request = new URLSearchParams(window.location.search).get("new");
+    if (request) {
+      window.history.replaceState(null, "", window.location.pathname);
+      draftFrom(request);
+    }
     studioApi.reviewQueue().then((runs) => setReviewCount(runs.length)).catch(() => {});
   }, []);
 
@@ -312,7 +327,7 @@ export default function WorkflowsScreen() {
           ) : null}
           {notice ? <p role="status" className="text-[13px] text-commerce-accent">{notice}</p> : null}
 
-          <UnansweredTopics title="Questions your workflows don't answer yet" />
+          <UnansweredTopics title="Questions your workflows don't answer yet" onReview={draftFrom} />
 
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.workflows.map((workflow) => (
