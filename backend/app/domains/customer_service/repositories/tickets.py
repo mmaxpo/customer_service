@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -53,6 +54,10 @@ class TicketRepository:
 
         for key, value in data.items():
             setattr(ticket, key, value)
+
+        status = data.get("status")
+        if status is not None and str(getattr(status, "value", status)).lower() in {"resolved", "closed"}:
+            ticket.resolved_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         await self.db.refresh(ticket)

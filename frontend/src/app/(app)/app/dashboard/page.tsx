@@ -1,46 +1,82 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ArrowUpRight, BarChart3, ChevronDown, Clock3, Download, Filter, RefreshCw, Send, ShieldAlert, Users } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw } from "lucide-react";
 
-import { customerServiceApi } from "@/domains/customer-service/api/customer-service";
-import { AutomationReport, SatisfactionReport } from "@/domains/customer-service/desk/DeskReports";
+import {
+  AutomationReport,
+  SatisfactionReport,
+  SpeedReport,
+  TicketsReport,
+  useInsights,
+} from "@/domains/customer-service/desk/DeskReports";
 
-type DeskTab = "automation" | "tickets" | "efficiency" | "assignees" | "updates" | "unsolved" | "backlog" | "satisfaction" | "slas";
-type InboxRow = { conversation_id: string; customer_name: string | null; customer_email: string | null; channel: string; subject: string | null; status: string; updated_at: string; ticket?: { priority?: string | null; assigned_to?: string | null } | null };
-
-const tabs: { id: DeskTab; label: string }[] = [
-  { id: "automation", label: "Automation" }, { id: "tickets", label: "Tickets" }, { id: "efficiency", label: "Efficiency" }, { id: "assignees", label: "Assignee activity" }, { id: "updates", label: "Agent updates" }, { id: "unsolved", label: "Unsolved tickets" }, { id: "backlog", label: "Backlog" }, { id: "satisfaction", label: "Satisfaction" }, { id: "slas", label: "SLAs" },
+const tabs = [
+  { id: "automation", label: "Automation", Report: AutomationReport },
+  { id: "tickets", label: "Tickets", Report: TicketsReport },
+  { id: "speed", label: "Speed", Report: SpeedReport },
+  { id: "satisfaction", label: "Satisfaction", Report: SatisfactionReport },
 ];
-const barColors = ["bg-[#78a900]", "bg-[#94bd19]", "bg-[#b8d64d]", "bg-[#d8e6a0]"];
-
-function number(value: unknown) { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
-function formatDate(value?: string) { return value ? new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"; }
-function FilterButton({ children, icon = false }: { children: React.ReactNode; icon?: boolean }) { return <button type="button" className="inline-flex h-9 items-center gap-2 rounded border border-border bg-surface px-3 text-sm text-foreground hover:bg-muted">{children}{icon ? <Filter size={14} className="text-text-secondary" /> : <ChevronDown size={14} className="text-text-secondary" />}</button>; }
-function Metric({ label, value, hint, accent = false }: { label: string; value: string | number; hint?: string; accent?: boolean }) { return <div className={`rounded border bg-surface px-4 py-4 ${accent ? "border-primary ring-1 ring-primary/40" : "border-border"}`}><p className="text-sm text-text-secondary">{label}</p><p className="mt-3 text-[27px] font-semibold tracking-tight text-foreground">{value}</p>{hint ? <p className="mt-1 text-xs text-text-secondary">{hint}</p> : null}</div>; }
-function BarList({ rows }: { rows: { label: string; value: number }[] }) { const max = Math.max(...rows.map((row) => row.value), 1); return <div className="space-y-4">{rows.map((row, index) => <div key={row.label} className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 text-sm"><span className="truncate text-text-secondary">{row.label}</span><div className="h-7 bg-muted"><div className={`h-full ${barColors[index % barColors.length]}`} style={{ width: `${Math.max(2, (row.value / max) * 100)}%` }} /></div><span className="text-right text-xs font-semibold text-text-secondary">{row.value}</span></div>)}</div>; }
 
 export default function DashboardPage() {
-  const [tab, setTab] = useState<DeskTab>("automation"); const [loading, setLoading] = useState(true); const [inbox, setInbox] = useState<InboxRow[]>([]); const [analytics, setAnalytics] = useState<Record<string, unknown>>({}); const [workload, setWorkload] = useState<any[]>([]); const [violations, setViolations] = useState<any[]>([]); const [updates, setUpdates] = useState<any[]>([]); const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  async function load() { setLoading(true); const [inboxResult, analyticsResult, workloadResult, violationsResult, auditResult] = await Promise.all([customerServiceApi.inbox().catch(() => []), customerServiceApi.analytics().catch(() => ({})), customerServiceApi.workloadReport().catch(() => []), customerServiceApi.slaViolations().catch(() => []), customerServiceApi.auditLogs(50).catch(() => [])]); setInbox(inboxResult as InboxRow[]); setAnalytics((analyticsResult ?? {}) as Record<string, unknown>); setWorkload(workloadResult as any[]); setViolations(violationsResult as any[]); setUpdates(auditResult as any[]); setLastUpdated(new Date()); setLoading(false); }
-  useEffect(() => { void load(); }, []);
-  const counts = useMemo(() => { const statuses = inbox.map((item) => item.status.toLowerCase()); return { total: number(analytics.total_conversations) || inbox.length, open: number(analytics.open_tickets) || statuses.filter((status) => status === "open").length, pending: number(analytics.pending_tickets) || statuses.filter((status) => status === "pending").length, resolved: number(analytics.closed_tickets) || statuses.filter((status) => ["resolved", "closed"].includes(status)).length, urgent: number(analytics.urgent_tickets) || inbox.filter((item) => ["urgent", "high"].includes(item.ticket?.priority?.toLowerCase() ?? "")).length }; }, [analytics, inbox]);
-  const unsolved = inbox.filter((item) => !["resolved", "closed"].includes(item.status.toLowerCase()));
-  const backlog = [{ label: "Less than 1 hour", value: unsolved.filter((item) => Date.now() - new Date(item.updated_at).getTime() < 3600000).length }, { label: "1–8 hours", value: unsolved.filter((item) => { const age = Date.now() - new Date(item.updated_at).getTime(); return age >= 3600000 && age < 28800000; }).length }, { label: "8–24 hours", value: unsolved.filter((item) => { const age = Date.now() - new Date(item.updated_at).getTime(); return age >= 28800000 && age < 86400000; }).length }, { label: "More than 1 day", value: unsolved.filter((item) => Date.now() - new Date(item.updated_at).getTime() >= 86400000).length }];
-  return <div className="min-h-full bg-[#f8f9fa] text-foreground"><header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-5 py-3"><div className="flex items-center gap-3"><div className="flex h-8 w-8 items-center justify-center rounded bg-primary text-white"><BarChart3 size={17} /></div><span className="text-lg font-semibold">Tajeran Desk</span></div><div className="flex items-center gap-2"><button type="button" className="hidden h-9 items-center gap-2 rounded border border-border px-3 text-sm sm:inline-flex">↗ Share</button><button type="button" className="hidden h-9 items-center gap-2 rounded border border-border px-3 text-sm sm:inline-flex"><Clock3 size={14} /> Schedule</button><button type="button" className="hidden h-9 items-center gap-2 rounded border border-border px-3 text-sm sm:inline-flex"><Download size={14} /> Export</button></div></header><main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Customer service analytics</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Support Desk</h1><p className="mt-1 text-sm text-text-secondary">Monitor the conversations, people, and automations behind your Shopify support operation.</p></div><div className="flex items-center gap-2 text-xs text-text-secondary"><span>{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Loading data"}</span><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-8 items-center gap-1 rounded border border-border bg-surface px-2.5 hover:bg-muted"><RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh</button></div></div><nav className="mt-6 flex gap-0 overflow-x-auto border-b border-border" aria-label="Desk reports" role="tablist">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm ${tab === item.id ? "border-primary font-semibold text-foreground" : "border-transparent text-text-secondary hover:text-foreground"}`}>{item.label}</button>)}</nav><div className="mt-5 flex flex-wrap items-center gap-2"><FilterButton icon>Time</FilterButton><span className="text-sm text-text-secondary">Currently viewing: <strong className="text-foreground">Last 30 days</strong></span><div className="ml-auto flex flex-wrap gap-2"><FilterButton>Channel</FilterButton><FilterButton>Team</FilterButton><FilterButton>Priority</FilterButton><FilterButton>Customer</FilterButton></div></div>{tab === "automation" ? <AutomationReport /> : null}{tab === "tickets" ? <TicketsTab counts={counts} inbox={inbox} loading={loading} /> : null}{tab === "efficiency" ? <EfficiencyTab counts={counts} /> : null}{tab === "assignees" ? <AssigneesTab workload={workload} loading={loading} /> : null}{tab === "updates" ? <UpdatesTab updates={updates} loading={loading} /> : null}{tab === "unsolved" ? <TicketTable title="Unsolved tickets" rows={unsolved} loading={loading} empty="All conversations are resolved." /> : null}{tab === "backlog" ? <BacklogTab rows={backlog} unsolved={unsolved.length} /> : null}{tab === "satisfaction" ? <SatisfactionReport /> : null}{tab === "slas" ? <SlasTab violations={violations} counts={counts} loading={loading} /> : null}</main></div>;
+  const [tab, setTab] = useState("automation");
+  const [days, setDays] = useState(30);
+  const { data, error, loading, reload } = useInsights(days);
+  const Report = tabs.find((item) => item.id === tab)!.Report;
+
+  return (
+    <div className="min-h-full bg-[#f8f9fa] text-foreground">
+      <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Below lg the app header already shows the page title. */}
+          <h1 className="hidden text-2xl font-semibold tracking-tight lg:block">Desk</h1>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Time period"
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value))}
+              className="h-9 rounded border border-border bg-surface px-2 text-sm"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
+            <button
+              type="button"
+              onClick={reload}
+              disabled={loading}
+              className="inline-flex h-9 items-center gap-1.5 rounded border border-border bg-surface px-3 text-sm hover:bg-muted"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh
+            </button>
+          </div>
+        </div>
+        <nav className="mt-4 flex overflow-x-auto border-b border-border" aria-label="Desk reports" role="tablist">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.id}
+              onClick={() => setTab(item.id)}
+              className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm ${tab === item.id ? "border-primary font-semibold text-foreground" : "border-transparent text-text-secondary hover:text-foreground"}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        {error ? <p role="alert" className="mt-5 text-sm text-danger">{error}</p> : null}
+        {data ? (
+          <>
+            {data.automation_previous.total + data.speed_previous.first_reply.conversations + data.rating_previous.responses === 0 ? (
+              <p className="mt-4 text-xs text-text-secondary">No earlier data to compare.</p>
+            ) : null}
+            <Report data={data} />
+          </>
+        ) : error ? null : (
+          <div className="mt-5 h-40 animate-pulse rounded bg-muted" />
+        )}
+      </main>
+    </div>
+  );
 }
-
-function TicketsTab({ counts, inbox, loading }: { counts: { total: number; open: number; pending: number; resolved: number; urgent: number }; inbox: InboxRow[]; loading: boolean }) { const channelRows = ["email", "website_chat", "shopify", "chat"].map((channel) => ({ label: channel.replace("_", " "), value: inbox.filter((item) => item.channel.toLowerCase() === channel).length })).filter((row) => row.value > 0); return <><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label="All conversations" value={loading ? "—" : counts.total} hint="Across connected channels" /><Metric label="Open tickets" value={loading ? "—" : counts.open} hint={`${counts.urgent} urgent`} accent /><Metric label="Pending tickets" value={loading ? "—" : counts.pending} hint="Waiting for a reply" /><Metric label="Resolved tickets" value={loading ? "—" : counts.resolved} hint="Closed in this period" /><Metric label="AI assisted" value="—" hint="Connect AI activity to report" /></div><div className="mt-5 grid gap-4 lg:grid-cols-2"><section className="rounded border border-border bg-surface p-5"><h2 className="font-semibold">Tickets by channel</h2><p className="mt-1 text-sm text-text-secondary">Where customers are contacting your team.</p>{channelRows.length ? <div className="mt-6"><BarList rows={channelRows} /></div> : <EmptyReport text="No channel volume yet." />}</section><TicketTable title="Latest tickets" rows={inbox.slice(0, 8)} loading={loading} empty="No conversations yet." /></div></>; }
-
-function EfficiencyTab({ counts }: { counts: { total: number; open: number; pending: number; resolved: number } }) { const firstReply = counts.total ? Math.max(1, Math.round((counts.open + counts.pending) * 1.4)) : 0; return <><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Metric label="First reply median" value={firstReply ? `${firstReply} min` : "—"} hint="Based on conversation activity" /><Metric label="First resolution median" value={counts.resolved ? "2.8 hrs" : "—"} hint="Resolved conversations" /><Metric label="Full resolution median" value="—" hint="Needs more history" /><Metric label="One-touch tickets" value="—" hint="No reply data yet" /><Metric label="Reopened tickets" value="—" hint="No reopen events yet" /></div><div className="mt-5 grid gap-4 lg:grid-cols-2"><section className="rounded border border-border bg-surface p-5"><h2 className="font-semibold">Tickets by first reply time</h2><p className="mt-1 text-sm text-text-secondary">Response speed for the selected period.</p><div className="mt-7"><BarList rows={[{ label: "0–1 hour", value: counts.resolved }, { label: "1–8 hours", value: counts.pending }, { label: "8–24 hours", value: counts.open }, { label: ">24 hours", value: 0 }, { label: "No replies", value: counts.open ? 1 : 0 }]} /></div></section><section className="rounded border border-border bg-surface p-5"><h2 className="font-semibold">Tickets by full resolution time</h2><p className="mt-1 text-sm text-text-secondary">Find conversations that need operational attention.</p><div className="mt-7"><BarList rows={[{ label: "0–5 hours", value: counts.resolved }, { label: "5–24 hours", value: counts.pending }, { label: "1–7 days", value: counts.open }, { label: "7–30 days", value: 0 }, { label: ">30 days", value: 0 }]} /></div></section></div></>; }
-
-function AssigneesTab({ workload, loading }: { workload: any[]; loading: boolean }) { return <section className="mt-5 rounded border border-border bg-surface p-5"><div className="flex items-center gap-2"><Users size={17} className="text-primary" /><div><h2 className="font-semibold">Assignee activity</h2><p className="mt-1 text-sm text-text-secondary">Open work and queue pressure by teammate.</p></div></div>{loading ? <div className="mt-6 h-20 animate-pulse rounded bg-muted" /> : workload.length ? <div className="mt-5 divide-y divide-border">{workload.map((item, index) => <div key={item.assigned_to ?? index} className="flex flex-wrap items-center justify-between gap-3 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{String(item.assigned_to ?? "U").slice(0, 1).toUpperCase()}</span><div><p className="font-medium">{item.assigned_to ?? "Unassigned"}</p><p className="text-xs text-text-secondary">{item.open_or_pending_tickets ?? 0} open or pending tickets</p></div></div><div className="flex items-center gap-8 text-right"><div><p className="text-xs text-text-secondary">Open</p><p className="font-semibold">{item.open_tickets ?? item.open_or_pending_tickets ?? 0}</p></div><div><p className="text-xs text-text-secondary">Pending</p><p className="font-semibold">{item.pending_tickets ?? 0}</p></div></div></div>)}</div> : <EmptyReport text="No assignment activity yet." />}</section>; }
-
-function UpdatesTab({ updates, loading }: { updates: any[]; loading: boolean }) { return <section className="mt-5 rounded border border-border bg-surface p-5"><div className="flex items-center gap-2"><Send size={17} className="text-primary" /><div><h2 className="font-semibold">Agent updates</h2><p className="mt-1 text-sm text-text-secondary">Recent human, AI, and automation activity.</p></div></div>{loading ? <div className="mt-6 h-20 animate-pulse rounded bg-muted" /> : updates.length ? <div className="mt-5 divide-y divide-border">{updates.slice(0, 20).map((item, index) => <div key={item.id ?? index} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm"><div><span className="font-medium">{item.action ?? "Support update"}</span><span className="ml-2 text-text-secondary">{item.entity_type ?? "workspace"}</span></div><time className="text-xs text-text-secondary">{formatDate(item.created_at)}</time></div>)}</div> : <EmptyReport text="No agent updates yet." />}</section>; }
-
-function TicketTable({ title, rows, loading, empty }: { title: string; rows: InboxRow[]; loading: boolean; empty: string }) { return <section className="rounded border border-border bg-surface p-5"><div className="flex items-center justify-between gap-2"><div><h2 className="font-semibold">{title}</h2><p className="mt-1 text-sm text-text-secondary">Customer conversations requiring attention.</p></div><Link href="/app/inbox" className="inline-flex items-center gap-1 text-sm font-medium text-primary">Open Inbox <ArrowUpRight size={14} /></Link></div>{loading ? <div className="mt-5 h-40 animate-pulse rounded bg-muted" /> : rows.length ? <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="border-b border-border text-xs uppercase tracking-wide text-text-secondary"><tr><th className="pb-3 font-medium">Customer</th><th className="pb-3 font-medium">Subject</th><th className="pb-3 font-medium">Channel</th><th className="pb-3 font-medium">Status</th><th className="pb-3 text-right font-medium">Updated</th></tr></thead><tbody className="divide-y divide-border">{rows.map((row) => <tr key={row.conversation_id}><td className="py-3 font-medium">{row.customer_name ?? row.customer_email ?? "Customer"}</td><td className="max-w-[220px] truncate py-3 text-text-secondary">{row.subject ?? "No subject"}</td><td className="py-3 capitalize text-text-secondary">{row.channel.replace("_", " ")}</td><td className="py-3"><span className="rounded-full bg-muted px-2 py-1 text-xs capitalize">{row.status}</span></td><td className="py-3 text-right text-xs text-text-secondary">{formatDate(row.updated_at)}</td></tr>)}</tbody></table></div> : <EmptyReport text={empty} />}</section>; }
-
-function BacklogTab({ rows, unsolved }: { rows: { label: string; value: number }[]; unsolved: number }) { return <><div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="Current backlog" value={unsolved} hint="Open and pending tickets" accent /><Metric label="Oldest ticket" value={unsolved ? "Needs review" : "—"} hint="Based on current queue" /><Metric label="At risk" value={rows[3]?.value ?? 0} hint="More than one day old" /></div><section className="mt-5 rounded border border-border bg-surface p-5"><h2 className="font-semibold">Backlog age</h2><p className="mt-1 text-sm text-text-secondary">Use this view to decide where to add coverage.</p><div className="mt-7"><BarList rows={rows} /></div></section></>; }
-function SlasTab({ violations, counts, loading }: { violations: any[]; counts: { total: number }; loading: boolean }) { return <><div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric label="SLA breaches" value={loading ? "—" : violations.length} hint="Open violations" accent /><Metric label="Tickets monitored" value={counts.total} hint="Across the workspace" /><Metric label="First reply target" value="Configure" hint="Set this in Routing" /></div><section className="mt-5 rounded border border-border bg-surface p-5"><div className="flex items-center gap-2"><ShieldAlert size={17} className="text-warning" /><div><h2 className="font-semibold">SLA attention</h2><p className="mt-1 text-sm text-text-secondary">Conversations that have crossed a response target.</p></div></div>{violations.length ? <div className="mt-5 space-y-2">{violations.slice(0, 20).map((item, index) => <div key={item.id ?? index} className="flex flex-wrap items-center justify-between gap-3 rounded border border-warning/30 bg-warning/5 p-3 text-sm"><span className="font-medium">Ticket {item.ticket_id ?? "—"}</span><span className="text-text-secondary">{item.target_type ?? "Response target"} · due {formatDate(item.due_at)}</span></div>)}</div> : <EmptyReport text="No open SLA breaches." />}</section></>; }
-function EmptyReport({ text }: { text: string }) { return <div className="mt-6 rounded border border-dashed border-border bg-muted/40 px-4 py-8 text-center text-sm text-text-secondary">{text}</div>; }

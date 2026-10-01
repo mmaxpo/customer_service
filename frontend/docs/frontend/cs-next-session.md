@@ -1,6 +1,6 @@
 # Customer service: next session handoff
 
-Written 2026-09-30, updated 2026-10-01. This replaces `automation-next-jobs.md` as the current plan
+Written 2026-09-30, updated 2026-10-01 (twice; the second update covers the Desk rebuild). This replaces `automation-next-jobs.md` as the current plan
 (that file is kept for history). Read this whole file before starting.
 
 Work **one task at a time**. For each task: inspect the code, build the
@@ -43,7 +43,7 @@ Spec: `backend/.claude/features/cs-frontend-spec.md`. Audit: `backend/.claude/fe
 |---|---|
 | Automations: list, graph editor, Ask TCOS proposals, Refine, test on past conversations (dry run), publish, version history, Needs review, run review | `frontend/src/domains/customer-service/automation/*`; backend `services/automation_studio.py`, routes `api/products/customer_service/studio.py` (`/customer-service/studio/*`) |
 | Live (Now + Activity log), menu item **Live** → `/app/live` | `frontend/src/domains/customer-service/live/*`; backend `services/live_monitor.py`. Activity is job-based: one row per customer message (the worker retries a job; each attempt is a separate run). Old developer run list still at `/app/runs`, not in the menu. |
-| Desk: new **Automation** tab (default) and real **Satisfaction** tab | `frontend/src/domains/customer-service/desk/DeskReports.tsx`; backend `services/desk_insights.py` (`GET /studio/desk/insights?days=`) |
+| Desk: four tabs (**Automation**, **Tickets**, **Speed**, **Satisfaction**), one working filter (Time: 7 / 30 / 90 days). Everything comes from one request; the page fetches it once and passes it to the tab. | Page `src/app/(app)/app/dashboard/page.tsx`; reports `frontend/src/domains/customer-service/desk/DeskReports.tsx`; backend `services/desk_insights.py` (`GET /studio/desk/insights?days=`, sections `automation`, `tickets`, `speed`, `rating`, each with a `_previous` where a comparison exists) |
 | Chat widget 👍/👎 on latest answer + one-time 1–5 rating | `frontend/public/tajeran-chat-widget.js`; backend `services/customer_feedback.py`, public routes in `channels.py`. 👎 creates a `run_flag` quality review → shows in Needs review. Ratings use `cs_csat_surveys`. |
 | Inbox: topic label + topic filter; run entries show "Workflow · vN", honest "Handed to your team", "Needs a person" case state, link to run review | `inbox/components/list/InboxQueue.tsx`, `inbox/case/*`, `model/topics.ts`; topic = latest `cs_conversation_insights.intent` |
 | Settings tabs: Workspace + **Connections** (Channels moved here; `/app/channels` redirects) | `src/app/(app)/app/settings/connections/page.tsx`, `domains/customer-service/channels/ConnectionsScreen.tsx`, `domains/workspace/SettingsTabs.tsx` |
@@ -70,7 +70,17 @@ Built on 2026-10-01 (all verified live through the public chat API, 14/14 correc
 
 Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
-Work is committed on branch `feature/cs-automation-live-desk` (not pushed).
+Built in the second 2026-10-01 session (**not committed yet**; ask the owner):
+
+| Behaviour | Where |
+|---|---|
+| Speed tab with real timings: first reply = first bot or team message after the customer's first message; resolve time = `resolved_at - created_at`; medians and time buckets; empty states where there is no data | `_speed` in `desk_insights.py`, `SpeedReport` |
+| Tickets tab: new / open / pending / resolved counts, real age of the oldest open ticket, backlog age chart (from `created_at`), tickets by channel (stored value is `website`), automation rate tile | `_tickets` in `desk_insights.py`, `TicketsReport` |
+| Removed from the Desk: Unsolved tickets, Assignee activity, Agent updates, Backlog (merged into Tickets), SLAs (returns with Task 7), the Share / Schedule / Export buttons, the Channel / Team / Priority / Customer filters, the "Latest tickets" table (same list as the Inbox). "No earlier data to compare." shows once, under the tabs | `dashboard/page.tsx` |
+| Resolving a ticket now saves `resolved_at` (it never did before). The "bot stays quiet until the ticket is resolved" rule reads the same field, so it only works for tickets resolved after this fix | `repositories/tickets.py` (`update`), `services/helpdesk.py` (bulk status) |
+| Chat no longer goes down when an email matches duplicate customers: the session links to the newest matching customer and logs a warning with the duplicate ids | `ensure_inbox_bridge_for_session` in `services/chat_service.py` |
+
+Work up to v22 is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
 ---
 
@@ -105,15 +115,19 @@ When the AI provider fails, the worker retries the whole job 3 times (about 27 s
 
 Done when: with the provider simulated down (in a test, not by breaking the real key), the customer gets the standby reply within a few seconds and the job has 1 attempt.
 
-### Task 4: NEXT. Desk filter buttons do nothing
+### Task 4: DONE (see section 2: Time works, the other filters were removed)
+
+Original task: Desk filter buttons do nothing
 `src/app/(app)/app/dashboard/page.tsx` has "Time / Channel / Team / Priority / Customer" buttons and a hard-coded "Last 30 days". Either make Time work (7 / 30 / 90 days, passed to the Automation and Satisfaction reports and the ticket data) or remove the buttons that can't work yet. Ask the owner which buttons to keep before building more than Time.
 
-### Task 5: Chat widget down for duplicate customers
+### Task 5: DONE for the outage (see section 2). Still open: **ask the owner** whether to merge the 24 duplicate `john@example.com` customers.
+
+Original task: Chat widget down for duplicate customers
 `john@example.com` matches 24 duplicate `cs_customers` rows in the dev workspace, so `CustomerIdentityService` raises `CustomerIdentityConflictError`, session creation returns 500, and the widget shows "Chat is temporarily unavailable".
 - **Ask the owner** before merging or deleting any customer rows.
 - Regardless: chat must not go down on an identity conflict. Degrade gracefully (e.g. start the session linked to the most recent matching customer or an unlinked one, and log the conflict for review). Keep the change in the chat/session product layer.
 
-### Task 6: Settings → Chat widget tab + self-service buttons
+### Task 6: NEXT. Settings → Chat widget tab + self-service buttons
 - Add a third Settings tab "Chat widget" that replaces the hidden `/app/chatbot` page (install code, look, greeting; reuse the existing chatbot components/settings API) and link to it from Connections.
 - Add switches for self-service buttons shown when the chat opens: **Track my order**, **Report a problem**, **Start a return**.
 - In the widget: "Track my order" asks for the order number (and email if needed) and shows status + tracking link from Shopify data directly (no AI). "Report a problem" and "Start a return" collect the order number and a short description, then hand to the team (human-only rule).
@@ -138,6 +152,9 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 ---
 
 ## 4. Known gaps worth remembering
+- The 7 tickets resolved before the `resolved_at` fix have no resolve time (the owner has not approved filling it in from `updated_at`), so they are missing from "Time to resolve" and "Resolved", and the bot stays quiet on any of them where a team member replied. One test ticket (`e40ba45e-36c7-40ac-aae0-354c848c06d3`, "John Duplicate Test") was resolved on 2026-10-01 to verify the fix.
+- `/app/operations` still uses `analytics()`, `workloadReport()`, `slaViolations()` and `auditLogs()`; the Desk no longer does.
+- Desk "Open" and "Pending" are the queue right now; the Time choice applies to new, resolved, speed, automation and ratings.
 - Duplicate-message timestamps: the workflow job is created a few ms before the triggering message is saved (the inbox timeline compensates).
 - `backend/app/domains/customer_service/repositories/workflow_executions.py` `list_for_user` loads the last 100 workspace jobs and filters by conversation in Python, so old conversations can lose their runs on a busy store.
 - `frontend/src/ui/layout/AppSidebar.tsx` and the old `domains/customer-service/channels/components/*` are unused.

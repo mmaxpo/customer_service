@@ -191,6 +191,8 @@ class CustomerServiceHelpdeskService:
                 )
                 if ticket:
                     ticket.status = payload.value
+                    if payload.value == "resolved":
+                        ticket.resolved_at = datetime.now(timezone.utc)
             elif payload.action == "assign":
                 ticket = await self.db.scalar(
                     select(Ticket).where(Ticket.conversation_id == row.id)

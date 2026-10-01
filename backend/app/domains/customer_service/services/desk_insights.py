@@ -27,6 +27,47 @@ def _automation(rows: list[dict]) -> dict:
     }
 
 
+FIRST_REPLY_BUCKETS = [
+    ("Under 1 minute", 60),
+    ("1–5 minutes", 300),
+    ("5–60 minutes", 3600),
+    ("1–24 hours", 86400),
+    ("More than 1 day", None),
+]
+RESOLUTION_BUCKETS = [
+    ("Under 1 hour", 3600),
+    ("1–8 hours", 28800),
+    ("8–24 hours", 86400),
+    ("1–7 days", 604800),
+    ("More than 7 days", None),
+]
+BACKLOG_BUCKETS = [
+    ("Less than 1 hour", 3600),
+    ("1–8 hours", 28800),
+    ("8–24 hours", 86400),
+    ("1–7 days", 604800),
+    ("More than 7 days", None),
+]
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return round(ordered[middle], 1)
+    return round((ordered[middle - 1] + ordered[middle]) / 2, 1)
+
+
+def _buckets(values: list[float], buckets: list[tuple[str, int | None]]) -> list[dict]:
+    rows, lower = [], 0
+    for label, upper in buckets:
+        rows.append({"label": label, "value": sum(1 for v in values if v >= lower and (upper is None or v < upper))})
+        lower = upper
+    return rows
+
+
 class DeskInsightsService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -50,6 +91,97 @@ class DeskInsightsService:
             "answer_feedback": await self._answer_feedback(workspace_id, start),
             "top_topics": await self._top_topics(workspace_id, start),
             "lowest_rated": await self._lowest_rated(workspace_id, start),
+            "speed": await self._speed(workspace_id, start, now),
+            "speed_previous": await self._speed(workspace_id, previous_start, start),
+            "tickets": await self._tickets(workspace_id, start),
+        }
+
+    async def _tickets(self, workspace_id: UUID, start: datetime) -> dict:
+        # Open and pending are the queue right now; new and resolved are for the period.
+        result = await self.db.execute(
+            text(
+                """
+                SELECT lower(t.status::text) AS status, c.channel, t.created_at, t.resolved_at,
+                       extract(epoch FROM now() - t.created_at) AS age
+                FROM cs_tickets t
+                JOIN cs_conversations c ON c.id = t.conversation_id
+                WHERE t.user_id = :workspace_id
+                """
+            ),
+            {"workspace_id": workspace_id},
+        )
+        rows = result.all()
+        waiting = [float(row.age) for row in rows if row.status in ("open", "pending")]
+        created = [row for row in rows if row.created_at >= start]
+        channels: dict[str, int] = {}
+        for row in created:
+            channels[row.channel] = channels.get(row.channel, 0) + 1
+        return {
+            "created": len(created),
+            "open": sum(1 for row in rows if row.status == "open"),
+            "pending": sum(1 for row in rows if row.status == "pending"),
+            "resolved": sum(1 for row in rows if row.resolved_at and row.resolved_at >= start),
+            "oldest_open_seconds": max(waiting) if waiting else None,
+            "backlog": _buckets(waiting, BACKLOG_BUCKETS),
+            "by_channel": [
+                {"label": channel, "value": count}
+                for channel, count in sorted(channels.items(), key=lambda item: -item[1])
+            ],
+        }
+
+    async def _speed(self, workspace_id: UUID, start: datetime, end: datetime) -> dict:
+        # First reply: from the customer's first message to the first answer by
+        # the bot or a team member. Conversations are counted in the period
+        # their first customer message falls in.
+        result = await self.db.execute(
+            text(
+                """
+                SELECT extract(epoch FROM (
+                  SELECT min(r.created_at) FROM cs_conversation_messages r
+                  WHERE r.conversation_id = first.conversation_id
+                    AND lower(r.sender_type::text) IN ('ai', 'agent')
+                    AND r.created_at > first.asked_at
+                ) - first.asked_at) AS seconds
+                FROM (
+                  SELECT t.conversation_id, min(m.created_at) AS asked_at
+                  FROM cs_tickets t
+                  JOIN cs_conversation_messages m ON m.conversation_id = t.conversation_id
+                  WHERE t.user_id = :workspace_id AND lower(m.sender_type::text) = 'customer'
+                  GROUP BY t.conversation_id
+                ) first
+                WHERE first.asked_at >= :start AND first.asked_at < :end
+                """
+            ),
+            {"workspace_id": workspace_id, "start": start, "end": end},
+        )
+        seconds = [row.seconds for row in result]
+        replied = [float(value) for value in seconds if value is not None]
+
+        result = await self.db.execute(
+            text(
+                """
+                SELECT extract(epoch FROM resolved_at - created_at) AS seconds
+                FROM cs_tickets
+                WHERE user_id = :workspace_id AND resolved_at >= :start AND resolved_at < :end
+                """
+            ),
+            {"workspace_id": workspace_id, "start": start, "end": end},
+        )
+        resolved = [float(row.seconds) for row in result]
+
+        return {
+            "first_reply": {
+                "conversations": len(seconds),
+                "replied": len(replied),
+                "median_seconds": _median(replied),
+                "buckets": _buckets(replied, FIRST_REPLY_BUCKETS)
+                + [{"label": "No reply yet", "value": len(seconds) - len(replied)}],
+            },
+            "resolution": {
+                "resolved": len(resolved),
+                "median_seconds": _median(resolved),
+                "buckets": _buckets(resolved, RESOLUTION_BUCKETS),
+            },
         }
 
     async def _rating(self, workspace_id: UUID, start: datetime, end: datetime) -> dict:

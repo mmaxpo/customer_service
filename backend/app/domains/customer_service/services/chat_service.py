@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import select, text
 
 from uuid import UUID
@@ -20,10 +22,14 @@ from app.tenancy.models import Workspace
 from app.domains.customer_service.repositories.chat_repository import (
     ChatRepository,
 )
+from app.domains.customer_service.models import Customer
 from app.domains.customer_service.services.customer_identity import (
+    CustomerIdentityConflictError,
     CustomerIdentityEvidence,
     CustomerIdentityService,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CustomerChatService:
@@ -239,13 +245,37 @@ class CustomerChatService:
                 )
             )
 
-        customer = await CustomerIdentityService(self.repository.db).resolve_or_create(
-            user_id=session.user_id,
-            workspace_id=workspace_id,
-            evidence=evidence,
-            name=(session.customer_name or f"Website visitor {session.visitor_id}"),
-            email=session.customer_email,
-        )
+        try:
+            customer = await CustomerIdentityService(
+                self.repository.db
+            ).resolve_or_create(
+                user_id=session.user_id,
+                workspace_id=workspace_id,
+                evidence=evidence,
+                name=(session.customer_name or f"Website visitor {session.visitor_id}"),
+                email=session.customer_email,
+            )
+        except CustomerIdentityConflictError as exc:
+            # Duplicate customer records must not take the chat down: use the
+            # newest match and leave the duplicates for the team to merge.
+            customer = await self.repository.db.scalar(
+                select(Customer)
+                .where(
+                    Customer.user_id == session.user_id,
+                    Customer.id.in_(exc.customer_ids),
+                )
+                .order_by(Customer.created_at.desc())
+                .limit(1)
+            )
+            if customer is None:
+                raise
+            logger.warning(
+                "Chat session %s matches %d duplicate customers; linked to %s. Duplicates: %s",
+                session.id,
+                len(exc.customer_ids),
+                customer.id,
+                sorted(str(customer_id) for customer_id in exc.customer_ids),
+            )
 
         conversation = await ConversationRepository(self.repository.db).create(
             user_id=session.user_id,

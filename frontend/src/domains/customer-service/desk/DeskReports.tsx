@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
@@ -8,9 +8,6 @@ import { apiJson, apiErrorMessage } from "@/platform/api/client";
 import { topicLabel } from "@/domains/customer-service/model/topics";
 
 import { formatDay } from "../inbox/case/format";
-
-// The Desk header says "Last 30 days"; these reports use the same period.
-const DAYS = 30;
 
 type Automation = {
   total: number;
@@ -24,41 +21,68 @@ type Automation = {
 
 type Rating = { responses: number; average: number | null; distribution: Record<string, number> };
 
-type Insights = {
+type Bucket = { label: string; value: number };
+
+type Speed = {
+  first_reply: { conversations: number; replied: number; median_seconds: number | null; buckets: Bucket[] };
+  resolution: { resolved: number; median_seconds: number | null; buckets: Bucket[] };
+};
+
+type Tickets = {
+  created: number;
+  open: number;
+  pending: number;
+  resolved: number;
+  oldest_open_seconds: number | null;
+  backlog: Bucket[];
+  by_channel: Bucket[];
+};
+
+export type Insights = {
+  days: number;
+  tickets: Tickets;
   automation: Automation;
   automation_previous: Automation;
   rating: Rating;
   rating_previous: Rating;
   answer_feedback: { helpful: number; not_helpful: number };
   top_topics: { topic: string; conversations: number }[];
+  speed: Speed;
+  speed_previous: Speed;
   lowest_rated: { conversation_id: string; score: number; comment: string | null; answered_at: string; customer_name: string | null }[];
 };
 
-function useInsights() {
+export function useInsights(days: number) {
   const [data, setData] = useState<Insights | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    apiJson<Insights>(`/api/customer-service/studio/desk/insights?days=${DAYS}`)
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    apiJson<Insights>(`/api/customer-service/studio/desk/insights?days=${days}`)
       .then(setData)
-      .catch((err) => setError(apiErrorMessage(err, "Could not load this report.")));
-  }, []);
-  return { data, error };
+      .catch((err) => setError(apiErrorMessage(err, "Could not load this report.")))
+      .finally(() => setLoading(false));
+  }, [days]);
+  useEffect(load, [load]);
+  return { data, error, loading, reload: load };
 }
 
-function change(current: number | null, previous: number | null, unit: string) {
+// No hint when there is nothing earlier to compare with: the page says so once.
+function change(current: number | null, previous: number | null, unit: string, days: number) {
   if (current === null) return "No data yet";
-  if (previous === null) return "No earlier data to compare";
+  if (previous === null) return undefined;
   const diff = Math.round((current - previous) * 10) / 10;
-  if (diff === 0) return "Same as the 30 days before";
-  return `${diff > 0 ? "+" : ""}${diff}${unit} vs the 30 days before`;
+  if (diff === 0) return `Same as the ${days} days before`;
+  return `${diff > 0 ? "+" : ""}${diff}${unit} vs the ${days} days before`;
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded border border-border bg-surface px-4 py-4">
       <p className="text-sm text-text-secondary">{label}</p>
       <p className="mt-2 text-[27px] font-semibold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1 text-xs text-text-secondary">{hint}</p>
+      {hint ? <p className="mt-1 text-xs text-text-secondary">{hint}</p> : null}
     </div>
   );
 }
@@ -84,26 +108,19 @@ function Empty({ text }: { text: string }) {
   return <p className="mt-5 rounded border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-text-secondary">{text}</p>;
 }
 
-function Status({ error }: { error: string | null }) {
-  return error
-    ? <p role="alert" className="mt-5 text-sm text-danger">{error}</p>
-    : <div className="mt-5 h-40 animate-pulse rounded bg-muted" />;
-}
-
 const percent = (value: number | null) => (value === null ? "—" : `${value}%`);
 
-export function AutomationReport() {
-  const { data, error } = useInsights();
-  if (!data) return <Status error={error} />;
+export function AutomationReport({ data }: { data: Insights }) {
+  const { days } = data;
   const { automation: now, automation_previous: before, answer_feedback: feedback } = data;
 
   return (
     <>
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Answered automatically" value={percent(now.answered_rate)} hint={change(now.answered_rate, before.answered_rate, " pts")} />
-        <Stat label="Handed to your team" value={percent(now.handed_over_rate)} hint={change(now.handed_over_rate, before.handed_over_rate, " pts")} />
-        <Stat label="Failed" value={percent(now.failed_rate)} hint={change(now.failed_rate, before.failed_rate, " pts")} />
-        <Stat label="Conversations handled" value={String(now.total)} hint={change(now.total, before.total || null, "")} />
+        <Stat label="Answered automatically" value={percent(now.answered_rate)} hint={change(now.answered_rate, before.answered_rate, " pts", days)} />
+        <Stat label="Handed to your team" value={percent(now.handed_over_rate)} hint={change(now.handed_over_rate, before.handed_over_rate, " pts", days)} />
+        <Stat label="Failed" value={percent(now.failed_rate)} hint={change(now.failed_rate, before.failed_rate, " pts", days)} />
+        <Stat label="Conversations handled" value={String(now.total)} hint={change(now.total, before.total || null, "", days)} />
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <section className="rounded border border-border bg-surface p-5">
@@ -144,9 +161,111 @@ export function AutomationReport() {
   );
 }
 
-export function SatisfactionReport() {
-  const { data, error } = useInsights();
-  if (!data) return <Status error={error} />;
+function duration(seconds: number | null) {
+  if (seconds === null) return "—";
+  if (seconds < 60) return `${Math.round(seconds)} sec`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  if (seconds < 86400) return `${Math.round(seconds / 360) / 10} hrs`;
+  return `${Math.round(seconds / 8640) / 10} days`;
+}
+
+function speedChange(current: number | null, previous: number | null, days: number) {
+  if (current === null) return "No data yet";
+  if (previous === null) return undefined;
+  if (duration(current) === duration(previous)) return `Same as the ${days} days before`;
+  return `${current < previous ? "Faster" : "Slower"} than the ${days} days before (${duration(previous)})`;
+}
+
+const channelLabel = (channel: string) => {
+  const text = channel.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+export function TicketsReport({ data }: { data: Insights }) {
+  const { tickets, automation } = data;
+
+  return (
+    <>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Stat label="New tickets" value={String(tickets.created)} hint="In this period" />
+        <Stat label="Open" value={String(tickets.open)} hint="Right now" />
+        <Stat label="Pending" value={String(tickets.pending)} hint="Right now" />
+        <Stat label="Resolved" value={String(tickets.resolved)} hint="In this period" />
+        <Stat label="Oldest open ticket" value={duration(tickets.oldest_open_seconds)} hint={tickets.oldest_open_seconds === null ? "Nothing is waiting" : "Since it was opened"} />
+        <Stat label="Answered automatically" value={percent(automation.answered_rate)} hint={`${automation.answered} of ${automation.total} conversations`} />
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <section className="rounded border border-border bg-surface p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Backlog age</h2>
+              <p className="mt-1 text-sm text-text-secondary">How long open and pending tickets have been waiting.</p>
+            </div>
+            <Link href="/app/inbox" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
+              Open Inbox <ArrowUpRight size={14} />
+            </Link>
+          </div>
+          {tickets.open + tickets.pending ? (
+            <div className="mt-5"><Bars rows={tickets.backlog} /></div>
+          ) : (
+            <Empty text="No open or pending tickets." />
+          )}
+        </section>
+        <section className="rounded border border-border bg-surface p-5">
+          <h2 className="font-semibold">Tickets by channel</h2>
+          <p className="mt-1 text-sm text-text-secondary">Where new tickets came from.</p>
+          {tickets.by_channel.length ? (
+            <div className="mt-5">
+              <Bars rows={tickets.by_channel.map((row) => ({ label: channelLabel(row.label), value: row.value }))} />
+            </div>
+          ) : (
+            <Empty text="No new tickets in this period." />
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+export function SpeedReport({ data }: { data: Insights }) {
+  const { days } = data;
+  const { first_reply: reply, resolution } = data.speed;
+  const before = data.speed_previous;
+
+  return (
+    <>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="First reply, median" value={duration(reply.median_seconds)} hint={speedChange(reply.median_seconds, before.first_reply.median_seconds, days)} />
+        <Stat label="Conversations replied to" value={`${reply.replied} of ${reply.conversations}`} hint="By the bot or a team member" />
+        <Stat label="Time to resolve, median" value={duration(resolution.median_seconds)} hint={speedChange(resolution.median_seconds, before.resolution.median_seconds, days)} />
+        <Stat label="Tickets resolved" value={String(resolution.resolved)} hint="In this period" />
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <section className="rounded border border-border bg-surface p-5">
+          <h2 className="font-semibold">Time to first reply</h2>
+          <p className="mt-1 text-sm text-text-secondary">From the customer's first message to the first answer.</p>
+          {reply.conversations ? (
+            <div className="mt-5"><Bars rows={reply.buckets} /></div>
+          ) : (
+            <Empty text="No new conversations in this period." />
+          )}
+        </section>
+        <section className="rounded border border-border bg-surface p-5">
+          <h2 className="font-semibold">Time to resolve</h2>
+          <p className="mt-1 text-sm text-text-secondary">From when a ticket was opened to when it was resolved.</p>
+          {resolution.resolved ? (
+            <div className="mt-5"><Bars rows={resolution.buckets} /></div>
+          ) : (
+            <Empty text="No tickets were resolved in this period." />
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+export function SatisfactionReport({ data }: { data: Insights }) {
+  const { days } = data;
   const { rating, rating_previous: before } = data;
 
   return (
@@ -155,7 +274,7 @@ export function SatisfactionReport() {
         <Stat
           label="Customer rating"
           value={rating.average === null ? "—" : `${rating.average} / 5`}
-          hint={change(rating.average, before.average, "")}
+          hint={change(rating.average, before.average, "", days)}
         />
         <Stat label="Ratings received" value={String(rating.responses)} hint="Asked once per chat, after an answer" />
       </div>
