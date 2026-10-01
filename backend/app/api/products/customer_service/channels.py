@@ -7,6 +7,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import SessionLocal, get_db
@@ -46,6 +47,7 @@ from app.domains.customer_service.services.support.commerce.customer_support_com
     CustomerSupportCommerceContextService,
 )
 from app.domains.customer_service.services.support.customer_support_orchestration import (
+    CustomerSupportOrchestrationResult,
     CustomerSupportOrchestrationService,
 )
 from app.domains.customer_service.services.event_subscriptions import (
@@ -432,20 +434,47 @@ async def create_public_message(
         user_id=settings.user_id,
     )
 
-    orchestration = await CustomerSupportOrchestrationService(
-        db=db,
-        chat_service=service,
-        commerce_context=CustomerSupportCommerceContextService(
-            capabilities=runtime_services.capabilities,
-            commerce_adapters=(
-                build_default_commerce_order_adapter_registry()
+    # Once a team member has replied, the conversation is theirs: no automated
+    # reply until the case is resolved.
+    team_is_handling = inbox_message is not None and bool(
+        await db.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM cs_conversation_messages m
+                  WHERE m.conversation_id = :conversation_id
+                    AND m.sender_type = 'agent'
+                    AND m.created_at > coalesce(
+                      (SELECT max(t.resolved_at) FROM cs_tickets t
+                        WHERE t.conversation_id = :conversation_id),
+                      '-infinity'::timestamptz)
+                )
+                """
             ),
-        ),
-    ).handle(
-        user_id=settings.user_id,
-        session=session,
-        message=message,
+            {"conversation_id": inbox_message.conversation_id},
+        )
     )
+
+    if team_is_handling:
+        orchestration = CustomerSupportOrchestrationResult(
+            handled=True,
+            dispatch_skip_reason="team_member_is_handling",
+        )
+    else:
+        orchestration = await CustomerSupportOrchestrationService(
+            db=db,
+            chat_service=service,
+            commerce_context=CustomerSupportCommerceContextService(
+                capabilities=runtime_services.capabilities,
+                commerce_adapters=(
+                    build_default_commerce_order_adapter_registry()
+                ),
+            ),
+        ).handle(
+            user_id=settings.user_id,
+            session=session,
+            message=message,
+        )
 
     support_intake = orchestration.support_intake
 

@@ -209,7 +209,9 @@ class LiveMonitorService:
         )
         waiting = []
         for row in result:
-            if row.run_status is None:
+            if row.run_status is None and row.last_agent_at is not None:
+                reason = "Your team is handling this conversation, and the customer wrote again."
+            elif row.run_status is None:
                 reason = "No automation answered this message."
             elif row.run_status == "paused":
                 reason = "An action is waiting for approval."

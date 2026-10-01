@@ -770,6 +770,7 @@ class AutomationStudioService:
                     "draft_status": outcome["status"],
                     "draft_error": _truncate(outcome["error"]),
                     "draft_answer": outcome["answer"],
+                    "draft_handed_over": outcome.get("handed_over", False),
                     "fallback_used": outcome["fallback_used"],
                     "blocked_steps": outcome["blocked_steps"],
                     "provider_unavailable": provider_down,
