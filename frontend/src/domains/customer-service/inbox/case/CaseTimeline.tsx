@@ -25,7 +25,32 @@ type Props = {
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  // Start a reply to the customer, or a team note, about one message.
+  onQuote?: (mode: "reply" | "note", text: string) => void;
 };
+
+// A message that answers another one starts with that message quoted as
+// "> " lines (the email convention; the chat widget shows it the same way).
+function splitQuote(body: string) {
+  const lines = body.split("\n");
+  let count = 0;
+  while (count < lines.length && lines[count].startsWith("> ")) count += 1;
+  return {
+    quote: lines.slice(0, count).map((line) => line.slice(2)).join("\n"),
+    rest: lines.slice(count).join("\n").replace(/^\n+/, ""),
+  };
+}
+
+function Body({ body }: { body: string }) {
+  const { quote, rest } = splitQuote(body);
+  if (!quote) return <>{body}</>;
+  return (
+    <>
+      <span className="mb-1.5 block border-l-2 border-border pl-2 text-[13px] leading-5 text-text-secondary">{quote}</span>
+      {rest}
+    </>
+  );
+}
 
 type Translation = {
   language: string | null;
@@ -116,7 +141,7 @@ function EventRow({ event, customerName, nested = false }: { event: TimelineEven
   );
 }
 
-function EntryView({ entry, customerName, translations }: { entry: TimelineEntry; customerName: string | null; translations: Map<string, string> }) {
+function EntryView({ entry, customerName, translations, onQuote }: { entry: TimelineEntry; customerName: string | null; translations: Map<string, string>; onQuote?: Props["onQuote"] }) {
   if (entry.kind === "message") {
     const fromCustomer = entry.actor === "customer";
     const translated = translations.get(entry.body.trim());
@@ -146,7 +171,7 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
                   : "border-border border-l-2 border-l-primary bg-surface",
             )}
           >
-            {entry.body}
+            <Body body={entry.body} />
             {translated ? (
               <p className="mt-2 border-t border-border pt-2 text-[13.5px] text-text-secondary">
                 <span className="mr-1.5 text-[11px] font-medium uppercase tracking-wide">Translation</span>
@@ -154,6 +179,12 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
               </p>
             ) : null}
           </div>
+          {onQuote ? (
+            <p className="mt-1 flex gap-3 text-[12px] font-medium">
+              <button type="button" onClick={() => onQuote("reply", splitQuote(entry.body).rest || entry.body)} className="text-primary hover:underline">Reply to this</button>
+              <button type="button" onClick={() => onQuote("note", splitQuote(entry.body).rest || entry.body)} className="text-text-secondary hover:text-foreground hover:underline">Note about this</button>
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -170,7 +201,7 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
             <p className="text-[12px] font-semibold text-text-secondary">Internal note</p>
             <time className="text-[11px] tabular-nums text-text-secondary" dateTime={entry.at}>{formatTime(entry.at)}</time>
           </div>
-          <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-5 text-foreground">{entry.body}</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-5 text-foreground"><Body body={entry.body} /></p>
         </div>
       </div>
     );
@@ -220,7 +251,7 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
   );
 }
 
-export function CaseTimeline({ conversationId, customerName, items, loading, error, onRetry }: Props) {
+export function CaseTimeline({ conversationId, customerName, items, loading, error, onRetry, onQuote }: Props) {
   const entries = useMemo(() => (items ? buildTimeline(items) : []), [items]);
   const activitySummary = useMemo(() => ({
     messages: entries.filter((entry) => entry.kind === "message").length,
@@ -339,7 +370,7 @@ export function CaseTimeline({ conversationId, customerName, items, loading, err
                       <span className="h-px flex-1 bg-border" aria-hidden />
                     </div>
                   ) : null}
-                  <EntryView entry={entry} customerName={customerName} translations={translations} />
+                  <EntryView entry={entry} customerName={customerName} translations={translations} onQuote={onQuote} />
                 </motion.li>
               );
             })}

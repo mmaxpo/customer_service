@@ -52,8 +52,10 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
   const priority = lower(item.ticket?.priority);
   const ticketStatus = lower(item.ticket?.status);
   const title = item.customer_name || item.customer_email || "Unknown customer";
-  const headline = item.subject || item.latest_message || "No messages yet";
-  const preview = item.subject ? item.latest_message : null;
+  // A reply to one message starts with that message quoted as "> " lines; show the answer.
+  const latest = item.latest_message?.replace(/^(> .*\n?)+/, "").trim() || item.latest_message;
+  const headline = item.subject || latest || "No messages yet";
+  const preview = item.subject ? latest : null;
   const waiting = useWaitingForPerson()?.find((row) => row.conversation_id === item.conversation_id);
 
   return (

@@ -353,6 +353,14 @@
       font-size: 12px;
     }
 
+    #${ROOT_ID} .tj-quote {
+      margin-bottom: 6px;
+      border-left: 3px solid rgba(100, 116, 139, 0.6);
+      padding-left: 8px;
+      font-size: 13px;
+      opacity: 0.75;
+    }
+
     #${ROOT_ID} .tj-bubble a {
       color: inherit;
       font-weight: 700;
@@ -526,7 +534,15 @@
 
   function renderMessage(message) {
     const role = message.role === "customer" ? "customer" : "assistant";
-    const bubble = `<div class="tj-bubble tj-bubble-${role}">${escapeHtml(message.content || "")}</div>`;
+    // A reply to one specific message starts with that message as "> " lines.
+    const lines = String(message.content || "").split("\n");
+    let quoted = 0;
+    while (quoted < lines.length && lines[quoted].startsWith("> ")) quoted += 1;
+    const quote = lines.slice(0, quoted).map((line) => line.slice(2)).join("\n");
+    const rest = lines.slice(quoted).join("\n").replace(/^\n+/, "");
+    const bubble = `<div class="tj-bubble tj-bubble-${role}">${
+      quote ? `<div class="tj-quote">${escapeHtml(quote)}</div>` : ""
+    }${escapeHtml(quote ? rest : message.content || "")}</div>`;
     if (role !== "assistant" || !message.id || message.id !== lastAnswerId()) return bubble;
     if (message.feedback) return `${bubble}<div class="tj-feedback">Thanks for your feedback.</div>`;
     const id = escapeAttr(message.id);

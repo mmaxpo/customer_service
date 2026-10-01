@@ -156,6 +156,18 @@ export default function InboxRoot({ queue, caseFile, composer }: InboxRootProps)
                 loading={caseFile.activityLoading}
                 error={caseFile.activityError}
                 onRetry={caseFile.refreshActivity}
+                onQuote={(mode, text) => {
+                  const quote = `> ${text.replace(/\s+/g, " ").trim().slice(0, 200)}\n`;
+                  composer.setComposerMode(mode);
+                  if (mode === "reply") composer.setReplyText(quote + composer.replyText.replace(/^(> .*\n)+/, ""));
+                  else composer.setInternalNoteText(quote + composer.internalNoteText.replace(/^(> .*\n)+/, ""));
+                  // Put the cursor after the quote so the person can type straight away.
+                  window.setTimeout(() => {
+                    const box = document.querySelector<HTMLTextAreaElement>('section[aria-label="Case"] textarea');
+                    box?.focus();
+                    box?.setSelectionRange(box.value.length, box.value.length);
+                  }, 50);
+                }}
               />
               <WorkflowSuggestion
                 conversationId={conversation.id}
