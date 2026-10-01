@@ -52,7 +52,7 @@ export function ThemeSwitch() {
   const toggle = () => {
     const next: Theme = dark ? "light" : "dark";
     applyTheme(next);
-    apiJson(ENDPOINT, { method: "PUT", body: jsonBody({ theme: next }) }).catch(() => {});
+    apiJson(ENDPOINT, { method: "POST", body: jsonBody({ theme: next }) }).catch(() => {});
   };
 
   return (

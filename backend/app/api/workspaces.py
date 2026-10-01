@@ -175,7 +175,7 @@ async def get_theme(
     return {"theme": theme}
 
 
-@router.put("/current/theme")
+@router.post("/current/theme")
 async def set_theme(
     payload: ThemeChoice,
     principal: Principal = Depends(get_current_principal),
