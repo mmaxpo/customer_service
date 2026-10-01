@@ -265,6 +265,7 @@ async def get_public_widget_settings(
         "human_handoff_message": settings.human_handoff_message,
         "operating_state": state,
         "is_within_business_hours": state == "open",
+        "self_service": _self_service(settings),
     }
 
 
@@ -652,6 +653,119 @@ async def rate_chat(
         score=payload.score,
         comment=(payload.comment or "").strip() or None,
     )
+
+
+SELF_SERVICE_REQUESTS = {
+    "report_problem": "Report a problem",
+    "start_return": "Start a return",
+}
+
+
+def _self_service(settings) -> dict[str, bool]:
+    """Self-service buttons the merchant switched on (Settings → Chat widget)."""
+    chosen = (settings.meta or {}).get("self_service") or {}
+    return {
+        key: bool(chosen.get(key))
+        for key in ("track_order", *SELF_SERVICE_REQUESTS)
+    }
+
+
+def _order_ref(order_number: str) -> str:
+    return "#" + order_number.strip().lstrip("#").strip()
+
+
+class TrackOrderRequest(BaseModel):
+    order_number: str = Field(min_length=1, max_length=40)
+    email: str = Field(min_length=3, max_length=320)
+
+
+class SelfServiceRequest(BaseModel):
+    kind: str
+    order_number: str = Field(min_length=1, max_length=40)
+    description: str = Field(min_length=1, max_length=2000)
+
+
+@chat_router.post("/public/{public_key}/sessions/{session_id}/track-order")
+async def track_order(
+    public_key: str,
+    session_id: UUID,
+    payload: TrackOrderRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Order status straight from Shopify, no AI. Shared only when the order
+    number and the email it was placed with both match; a wrong number and a
+    wrong email get the same answer."""
+    session = await _public_session(db, public_key, session_id)
+    settings = await build_service(db).get_widget_settings_by_public_key(
+        public_key=public_key
+    )
+    if not _self_service(settings)["track_order"]:
+        raise HTTPException(status_code=404, detail="Order tracking is not enabled")
+
+    order = await build_application_runtime_services(
+        db=db, user_id=session.user_id
+    ).capabilities.invoke(
+        "shopify.get_order",
+        user_id=session.user_id,
+        payload={"order_ref": _order_ref(payload.order_number)},
+    )
+
+    order_email = str(order.get("customer_email") or "").strip().lower()
+    if not order.get("order_id") or not order_email or order_email != payload.email.strip().lower():
+        return {"found": False}
+
+    summary = order.get("summary") or {}
+    return {
+        "found": True,
+        "order_name": order.get("order_name"),
+        "paid": bool(summary.get("is_paid")),
+        "shipped": bool(summary.get("is_fulfilled")),
+        "carrier": summary.get("carrier"),
+        "tracking_number": summary.get("tracking_number"),
+        "tracking_url": summary.get("tracking_url"),
+    }
+
+
+@chat_router.post("/public/{public_key}/sessions/{session_id}/requests")
+async def self_service_request(
+    public_key: str,
+    session_id: UUID,
+    payload: SelfServiceRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Problem reports and returns go straight to the team: no automation runs."""
+    session = await _public_session(db, public_key, session_id)
+    service = build_service(db)
+    settings = await service.get_widget_settings_by_public_key(public_key=public_key)
+    if not _self_service(settings).get(payload.kind):
+        raise HTTPException(status_code=404, detail="This request type is not enabled")
+
+    message = await service.add_customer_message(
+        session_id=session.id,
+        content=(
+            f"{SELF_SERVICE_REQUESTS[payload.kind]}: order {_order_ref(payload.order_number)}\n"
+            f"{payload.description.strip()}"
+        ),
+    )
+    inbox_message = await service.add_inbox_customer_message_for_chat_session(
+        session=session, chat_message=message
+    )
+    reply = await service.add_ai_message(
+        session_id=session.id,
+        content=(
+            "Thanks. I've passed your request to our team. They'll review it "
+            "and reply here. Nothing on your order has been changed yet."
+        ),
+    )
+    await service.add_inbox_ai_message_for_chat_session(session=session, chat_message=reply)
+    await service.commit()
+
+    if inbox_message is not None:
+        background_tasks.add_task(
+            _analyze_conversation, session.user_id, inbox_message.conversation_id
+        )
+    return {"ok": True}
 
 
 # ============================================================

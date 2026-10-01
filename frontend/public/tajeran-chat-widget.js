@@ -49,6 +49,16 @@
     sending: false,
     pollTimer: null,
     ratedSessionId: localStorage.getItem(ratedKey),
+    // Self-service: the open form ({ kind, busy, error }) and answers shown
+    // only in this chat window (order status is not saved to the conversation).
+    selfService: null,
+    notes: [],
+  };
+
+  const SELF_SERVICE = {
+    track_order: { label: "Track my order", submit: "Check status" },
+    report_problem: { label: "Report a problem", submit: "Send to our team", prompt: "What went wrong?" },
+    start_return: { label: "Start a return", submit: "Send to our team", prompt: "Why are you returning it?" },
   };
 
   const root = document.createElement("div");
@@ -277,6 +287,70 @@
 
     #${ROOT_ID} .tj-rating span { margin-right: auto; }
 
+    #${ROOT_ID} .tj-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      border-top: 1px solid #e2e8f0;
+      padding: 10px 12px 0;
+      background: #ffffff;
+    }
+
+    #${ROOT_ID} .tj-actions button,
+    #${ROOT_ID} .tj-cancel {
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #0f172a;
+      cursor: pointer;
+      font-size: 12.5px;
+      padding: 7px 11px;
+    }
+
+    #${ROOT_ID} .tj-actions button:hover,
+    #${ROOT_ID} .tj-cancel:hover {
+      border-color: #94a3b8;
+    }
+
+    #${ROOT_ID} .tj-form {
+      display: grid;
+      gap: 8px;
+      border-top: 1px solid #e2e8f0;
+      padding: 12px;
+      background: #ffffff;
+    }
+
+    #${ROOT_ID} .tj-form-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    #${ROOT_ID} .tj-form textarea.tj-input {
+      resize: none;
+      font-family: inherit;
+    }
+
+    #${ROOT_ID} .tj-form-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    #${ROOT_ID} .tj-form-buttons .tj-send {
+      flex: 1;
+      height: 38px;
+    }
+
+    #${ROOT_ID} .tj-form-error {
+      color: #991b1b;
+      font-size: 12px;
+    }
+
+    #${ROOT_ID} .tj-bubble a {
+      color: inherit;
+      font-weight: 700;
+    }
+
     #${ROOT_ID} .tj-powered {
       padding: 8px 12px 10px;
       text-align: center;
@@ -335,19 +409,24 @@
           </div>
           <div class="tj-messages">
             ${
-              state.messages.length
-                ? state.messages.map(renderMessage).join("")
+              state.messages.length + state.notes.length
+                ? renderConversation()
                 : `<div class="tj-bubble tj-bubble-assistant">${escapeHtml(welcome)}</div>
                    <div class="tj-empty">Send a message and your Tajeran support workflow will handle it.</div>`
             }
           </div>
-          ${renderRating()}
+          ${
+            state.selfService
+              ? renderSelfServiceForm(brandColor)
+              : `${renderRating()}
+          ${renderSelfServiceButtons()}
           <form class="tj-input-row">
             <input class="tj-input" name="message" placeholder="Write a message..." autocomplete="off" />
             <button class="tj-send" type="submit" style="background:${escapeAttr(brandColor)}" ${state.sending ? "disabled" : ""}>
               ${state.sending ? "..." : "Send"}
             </button>
-          </form>
+          </form>`
+          }
           <div class="tj-powered">Powered by <strong>Tajeran.ai</strong></div>
         </div>
         <button class="tj-launcher" type="button" aria-label="Open chat" style="background:${escapeAttr(brandColor)}">
@@ -370,7 +449,7 @@
     async function handleSend(event) {
       if (event) event.preventDefault();
 
-      const input = root.querySelector(".tj-input");
+      const input = root.querySelector(".tj-input-row .tj-input");
       const value = String(input?.value || "").trim();
 
       if (!value) return;
@@ -390,11 +469,26 @@
       button.addEventListener("click", () => sendRating(Number(button.getAttribute("data-rating"))));
     });
 
+    root.querySelectorAll("[data-self-service]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.selfService = { kind: button.getAttribute("data-self-service") };
+        renderShell();
+        root.querySelector(".tj-form .tj-input")?.focus();
+      });
+    });
+
+    root.querySelector(".tj-cancel")?.addEventListener("click", () => {
+      state.selfService = null;
+      renderShell();
+    });
+
+    root.querySelector(".tj-form")?.addEventListener("submit", submitSelfService);
+
     root.querySelector(".tj-input-row")?.addEventListener("submit", handleSend);
 
-    root.querySelector(".tj-send")?.addEventListener("click", handleSend);
+    root.querySelector(".tj-input-row .tj-send")?.addEventListener("click", handleSend);
 
-    root.querySelector(".tj-input")?.addEventListener("keydown", (event) => {
+    root.querySelector(".tj-input-row .tj-input")?.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && !event.shiftKey) {
         handleSend(event);
       }
@@ -433,6 +527,116 @@
         <button type="button" data-feedback="up" data-message-id="${id}" aria-label="Yes, this was helpful">👍</button>
         <button type="button" data-feedback="down" data-message-id="${id}" aria-label="No, this wasn't helpful">👎</button>
       </div>`;
+  }
+
+  // Saved messages and this window's order-status answers, in time order.
+  function renderConversation() {
+    return [...state.messages, ...state.notes]
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      .map((item) => (item.note ? renderNote(item) : renderMessage(item)))
+      .join("");
+  }
+
+  function renderNote(note) {
+    const link = /^https?:\/\//i.test(note.url || "")
+      ? `<br><a href="${escapeAttr(note.url)}" target="_blank" rel="noopener noreferrer">Track your parcel</a>`
+      : "";
+    return `<div class="tj-bubble tj-bubble-${note.role}">${escapeHtml(note.content)}${link}</div>`;
+  }
+
+  function renderSelfServiceButtons() {
+    const enabled = (state.settings && state.settings.self_service) || {};
+    const buttons = Object.keys(SELF_SERVICE)
+      .filter((kind) => enabled[kind])
+      .map((kind) => `<button type="button" data-self-service="${kind}">${SELF_SERVICE[kind].label}</button>`);
+    return buttons.length ? `<div class="tj-actions">${buttons.join("")}</div>` : "";
+  }
+
+  function renderSelfServiceForm(brandColor) {
+    const { kind, busy, error } = state.selfService;
+    const action = SELF_SERVICE[kind];
+    return `
+      <form class="tj-form">
+        <div class="tj-form-title">${action.label}</div>
+        <input class="tj-input" name="order_number" placeholder="Order number, for example #1006" aria-label="Order number" maxlength="40" autocomplete="off" required />
+        ${
+          kind === "track_order"
+            ? `<input class="tj-input" name="email" type="email" placeholder="Email used for the order" aria-label="Email used for the order" value="${escapeAttr(customerEmail || "")}" required />`
+            : `<textarea class="tj-input" name="description" rows="3" placeholder="${action.prompt}" aria-label="${action.prompt}" maxlength="2000" required></textarea>`
+        }
+        ${error ? `<div class="tj-form-error" role="alert">${escapeHtml(error)}</div>` : ""}
+        <div class="tj-form-buttons">
+          <button class="tj-cancel" type="button">Cancel</button>
+          <button class="tj-send" type="submit" style="background:${escapeAttr(brandColor)}" ${busy ? "disabled" : ""}>
+            ${busy ? "..." : action.submit}
+          </button>
+        </div>
+      </form>`;
+  }
+
+  async function submitSelfService(event) {
+    event.preventDefault();
+    const current = state.selfService;
+    if (!current || current.busy) return;
+
+    const values = Object.fromEntries(new FormData(event.target).entries());
+    const orderNumber = String(values.order_number || "").trim();
+    const form = event.target;
+    current.busy = true;
+    form.querySelector(".tj-send").disabled = true;
+
+    try {
+      await ensureSession();
+      const base = `${apiBase}/sessions/${state.sessionId}`;
+
+      if (current.kind === "track_order") {
+        const order = await fetchJson(`${base}/track-order`, {
+          method: "POST",
+          body: { order_number: orderNumber, email: values.email },
+        });
+        const created_at = new Date().toISOString();
+        state.notes.push({ note: true, created_at, role: "customer", content: `Track my order ${orderNumber}` });
+        state.notes.push({ note: true, created_at, ...orderStatusNote(order) });
+      } else {
+        await fetchJson(`${base}/requests`, {
+          method: "POST",
+          body: { kind: current.kind, order_number: orderNumber, description: values.description },
+        });
+      }
+
+      state.selfService = null;
+      await loadMessages();
+    } catch (error) {
+      console.warn("[Tajeran Chat] Self-service request failed.", error);
+      current.busy = false;
+      current.error = "That didn't work. Please try again, or write us a message.";
+      form.querySelector(".tj-send").disabled = false;
+      if (!form.querySelector(".tj-form-error")) {
+        form
+          .querySelector(".tj-form-buttons")
+          .insertAdjacentHTML("beforebegin", `<div class="tj-form-error" role="alert">${escapeHtml(current.error)}</div>`);
+      }
+    }
+  }
+
+  function orderStatusNote(order) {
+    if (!order.found) {
+      return {
+        role: "assistant",
+        content:
+          "We couldn't find an order with that number and email. Please check both, or write us a message and our team will help.",
+      };
+    }
+    if (!order.shipped) {
+      return {
+        role: "assistant",
+        content: `Order ${order.order_name} ${order.paid ? "is paid and" : "is awaiting payment and"} hasn't shipped yet.`,
+      };
+    }
+    const tracking = order.tracking_number
+      ? ` Tracking number: ${order.tracking_number}${order.carrier ? ` (${order.carrier})` : ""}.`
+      : " There is no tracking number for it yet.";
+    return { role: "assistant", content: `Order ${order.order_name} has shipped.${tracking}`, url: order.tracking_url };
   }
 
   // Ask once per chat, after the customer has had an answer.
@@ -537,7 +741,7 @@
       const active = document.activeElement;
       const typing = active && active.classList && active.classList.contains("tj-input");
 
-      if (state.open && state.sessionId && !typing && !state.sending) {
+      if (state.open && state.sessionId && !typing && !state.sending && !state.selfService) {
         loadMessages().catch(() => {});
       }
     }, 3500);

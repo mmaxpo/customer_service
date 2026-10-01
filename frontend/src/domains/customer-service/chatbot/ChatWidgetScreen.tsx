@@ -1,0 +1,178 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+
+import {
+  getChatWidgetSettings,
+  updateChatWidgetSettings,
+} from "@/domains/customer-service/api/customer-service";
+import { apiErrorMessage } from "@/platform/api/client";
+import { Button } from "@/ui/primitives/button";
+import { Input } from "@/ui/primitives/input";
+import { Textarea } from "@/ui/primitives/textarea";
+
+const WIDGET_HOST = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+// Buttons the customer sees when the chat opens.
+const SELF_SERVICE = [
+  { key: "track_order", label: "Track my order", description: "Shows order status and the tracking link from Shopify. The customer enters the order number and the email it was placed with." },
+  { key: "report_problem", label: "Report a problem", description: "Collects the order number and what went wrong, then hands it to your team." },
+  { key: "start_return", label: "Start a return", description: "Collects the order number and the reason, then hands it to your team." },
+] as const;
+
+type SelfServiceKey = (typeof SELF_SERVICE)[number]["key"];
+
+type Form = {
+  enabled: boolean;
+  title: string;
+  assistant_name: string;
+  welcome_message: string;
+  brand_color: string;
+  position: string;
+  self_service: Record<SelfServiceKey, boolean>;
+};
+
+const labelClass = "block text-[12.5px] font-medium text-foreground";
+
+export default function ChatWidgetScreen() {
+  const [form, setForm] = useState<Form | null>(null);
+  const [publicKey, setPublicKey] = useState("");
+  const [meta, setMeta] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    getChatWidgetSettings()
+      .then((settings) => {
+        const chosen = (settings.meta?.self_service ?? {}) as Partial<Record<SelfServiceKey, boolean>>;
+        setPublicKey(settings.public_key);
+        setMeta(settings.meta ?? {});
+        setForm({
+          enabled: settings.enabled,
+          title: settings.title,
+          assistant_name: settings.assistant_name,
+          welcome_message: settings.welcome_message,
+          brand_color: settings.brand_color,
+          position: settings.position,
+          self_service: {
+            track_order: Boolean(chosen.track_order),
+            report_problem: Boolean(chosen.report_problem),
+            start_return: Boolean(chosen.start_return),
+          },
+        });
+      })
+      .catch((err) => setError(apiErrorMessage(err, "Could not load the chat widget settings.")));
+  }, []);
+
+  if (!form) {
+    return error
+      ? <p role="alert" className="mt-5 text-sm text-danger">{error}</p>
+      : <div className="mt-5 h-40 animate-pulse rounded bg-muted" />;
+  }
+
+  const set = (values: Partial<Form>) => {
+    setForm({ ...form, ...values });
+    setStatus(null);
+  };
+  const installCode = `<script src="${WIDGET_HOST}/tajeran-chat-widget.js" data-tajeran-public-key="${publicKey}" async></script>`;
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!form) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { self_service, ...look } = form;
+      const nextMeta = { ...meta, self_service };
+      await updateChatWidgetSettings({ ...look, meta: nextMeta });
+      setMeta(nextMeta);
+      setStatus("Saved.");
+    } catch (err) {
+      setError(apiErrorMessage(err, "Could not save the chat widget settings."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copy() {
+    await navigator.clipboard.writeText(installCode);
+    setCopied(true);
+  }
+
+  return (
+    <form onSubmit={save} className="mt-5 max-w-2xl space-y-8">
+      <section>
+        <label className="flex items-start gap-3">
+          <input type="checkbox" role="switch" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} className="mt-0.5 h-4 w-4" />
+          <span>
+            <span className="block text-sm font-semibold text-foreground">Show the chat on your store</span>
+            <span className="block text-[13px] text-text-secondary">The chat bubble appears on pages that have the install code.</span>
+          </span>
+        </label>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Install code</h2>
+        <p className="mt-1 text-[13px] text-text-secondary">Paste this into your Shopify theme, just before the closing body tag.</p>
+        <pre className="mt-2.5 overflow-x-auto rounded border border-border bg-muted px-3 py-2.5 text-xs text-foreground"><code>{installCode}</code></pre>
+        {WIDGET_HOST.includes("localhost") ? (
+          <p className="mt-2 text-[13px] text-text-secondary">This code points at localhost, so it only works on this computer. A live store needs the app's public HTTPS address.</p>
+        ) : null}
+        <Button type="button" size="sm" variant="secondary" onClick={copy} className="mt-2.5">{copied ? "Copied" : "Copy code"}</Button>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Look and greeting</h2>
+        <div className="mt-2.5 grid gap-3 sm:grid-cols-2">
+          <label className={labelClass}>Title<Input className="mt-1" value={form.title} maxLength={120} onChange={(e) => set({ title: e.target.value })} required /></label>
+          <label className={labelClass}>Assistant name<Input className="mt-1" value={form.assistant_name} maxLength={120} onChange={(e) => set({ assistant_name: e.target.value })} required /></label>
+          <label className={labelClass}>
+            Colour
+            <span className="mt-1 flex gap-2">
+              <input type="color" aria-label="Pick a colour" value={/^#[0-9a-f]{6}$/i.test(form.brand_color) ? form.brand_color : "#000000"} onChange={(e) => set({ brand_color: e.target.value })} className="h-9 w-11 shrink-0 rounded border border-border bg-surface p-1" />
+              <Input value={form.brand_color} maxLength={32} onChange={(e) => set({ brand_color: e.target.value })} required />
+            </span>
+          </label>
+          <label className={labelClass}>
+            Position
+            <select value={form.position} onChange={(e) => set({ position: e.target.value })} className="mt-1 h-9 w-full rounded border border-border bg-surface px-2 text-sm font-normal">
+              <option value="bottom-right">Bottom right</option>
+              <option value="bottom-left">Bottom left</option>
+            </select>
+          </label>
+          <label className={`${labelClass} sm:col-span-2`}>Greeting<Textarea className="mt-1 font-normal" value={form.welcome_message} onChange={(e) => set({ welcome_message: e.target.value })} required /></label>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold text-foreground">Self-service buttons</h2>
+        <p className="mt-1 text-[13px] text-text-secondary">Shown when a customer opens the chat. They work without AI.</p>
+        <div className="mt-2.5 divide-y divide-border border-y border-border">
+          {SELF_SERVICE.map((item) => (
+            <label key={item.key} className="flex items-start gap-3 py-3">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={form.self_service[item.key]}
+                onChange={(e) => set({ self_service: { ...form.self_service, [item.key]: e.target.checked } })}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span>
+                <span className="block text-sm font-medium text-foreground">{item.label}</span>
+                <span className="block text-[13px] text-text-secondary">{item.description}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <div className="flex items-center gap-3">
+        <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        {status ? <p role="status" className="text-[13px] text-text-secondary">{status}</p> : null}
+        {error ? <p role="alert" className="text-[13px] text-danger">{error}</p> : null}
+      </div>
+    </form>
+  );
+}

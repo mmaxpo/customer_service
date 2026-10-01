@@ -8,6 +8,7 @@ import { cn } from "@/platform/utils";
 const tabs = [
   { href: "/app/settings", label: "Workspace" },
   { href: "/app/settings/connections", label: "Connections" },
+  { href: "/app/settings/chat-widget", label: "Chat widget" },
 ];
 
 export function SettingsTabs() {

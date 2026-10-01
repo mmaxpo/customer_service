@@ -70,7 +70,7 @@ Built on 2026-10-01 (all verified live through the public chat API, 14/14 correc
 
 Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
-Built in the second 2026-10-01 session (**not committed yet**; ask the owner):
+Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget rows are **not committed yet**, ask the owner):
 
 | Behaviour | Where |
 |---|---|
@@ -79,6 +79,9 @@ Built in the second 2026-10-01 session (**not committed yet**; ask the owner):
 | Removed from the Desk: Unsolved tickets, Assignee activity, Agent updates, Backlog (merged into Tickets), SLAs (returns with Task 7), the Share / Schedule / Export buttons, the Channel / Team / Priority / Customer filters, the "Latest tickets" table (same list as the Inbox). "No earlier data to compare." shows once, under the tabs | `dashboard/page.tsx` |
 | Resolving a ticket now saves `resolved_at` (it never did before). The "bot stays quiet until the ticket is resolved" rule reads the same field, so it only works for tickets resolved after this fix | `repositories/tickets.py` (`update`), `services/helpdesk.py` (bulk status) |
 | Chat no longer goes down when an email matches duplicate customers: the session links to the newest matching customer and logs a warning with the duplicate ids | `ensure_inbox_bridge_for_session` in `services/chat_service.py` |
+| Settings → **Chat widget** tab: on/off, install code, title, assistant name, colour, position, greeting, and three self-service switches stored in the widget settings under `meta.self_service` (`track_order`, `report_problem`, `start_return`). `/app/chatbot` redirects here; Connections links here. The tab saves only its own fields, so the attached workflow and auto-answer settings are untouched | `src/app/(app)/app/settings/chat-widget/page.tsx`, `domains/customer-service/chatbot/ChatWidgetScreen.tsx`, `domains/workspace/SettingsTabs.tsx` |
+| Widget self-service buttons (shown above the message box when switched on). **Track my order**: order number + email → status and tracking link straight from Shopify, no AI; the answer is shown only in the chat window, not saved to the conversation. **Report a problem** / **Start a return**: order number + description → saved as a customer message plus a "passed to our team" reply; no automation runs, and it appears in Live → Now after the usual one-minute grace | `frontend/public/tajeran-chat-widget.js`; `POST /chat/public/{key}/sessions/{id}/track-order` and `/requests` in `backend/app/api/products/customer_service/channels.py`; public settings return `self_service` |
+| Order lookup protection: `track-order` answers only when the order number and the order's email both match; a wrong number, a wrong email and an order with no email all return the same "not found" | `track_order` in `channels.py` (verified with #1006, #1007, #1001 and an unknown number) |
 
 Work up to v22 is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
@@ -127,13 +130,15 @@ Original task: Chat widget down for duplicate customers
 - **Ask the owner** before merging or deleting any customer rows.
 - Regardless: chat must not go down on an identity conflict. Degrade gracefully (e.g. start the session linked to the most recent matching customer or an unlinked one, and log the conflict for review). Keep the change in the chat/session product layer.
 
-### Task 6: NEXT. Settings → Chat widget tab + self-service buttons
+### Task 6: DONE (see section 2)
+
+Original task: Settings → Chat widget tab + self-service buttons
 - Add a third Settings tab "Chat widget" that replaces the hidden `/app/chatbot` page (install code, look, greeting; reuse the existing chatbot components/settings API) and link to it from Connections.
 - Add switches for self-service buttons shown when the chat opens: **Track my order**, **Report a problem**, **Start a return**.
 - In the widget: "Track my order" asks for the order number (and email if needed) and shows status + tracking link from Shopify data directly (no AI). "Report a problem" and "Start a return" collect the order number and a short description, then hand to the team (human-only rule).
 - Check the order lookup can't be used to read someone else's order (require order number + matching email).
 
-### Task 7: Reply-time targets + business hours
+### Task 7: NEXT. Reply-time targets + business hours
 Settings → Workspace: "First reply within X, during business hours" plus the weekly schedule (the tab already has a Business hours setting; an SLA backend exists, see `customerServiceApi.slaViolations` and `backend/.claude/features/basic-sla.md`). Show "close to missing the target" in Live → Now, "% answered within target" in Desk, and a small timer on inbox cases near the target.
 
 ### Task 8: Sales influenced by support
@@ -152,6 +157,11 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 ---
 
 ## 4. Known gaps worth remembering
+- The old chatbot page's controls for the attached workflow, minimum confidence and hand-off message are no longer in the UI (the values are kept). `chatbot/components/ChatbotHero.tsx`, `StorefrontPreviewPanel.tsx` and `ChatbotUi.tsx` are now unused.
+- A self-service request shows in Live with the reason "No automation answered this message." A clearer reason would need its own marker.
+- `public/widget-test.html` has no viewport meta tag, so the widget looks tiny at 375px on that page only.
+- The bot answered a bare "1006" with the gift-wrapping article (conversation memory carried the earlier question).
+- The dev workspace has all three self-service switches turned on (set during testing on 2026-10-01).
 - The 7 tickets resolved before the `resolved_at` fix have no resolve time (the owner has not approved filling it in from `updated_at`), so they are missing from "Time to resolve" and "Resolved", and the bot stays quiet on any of them where a team member replied. One test ticket (`e40ba45e-36c7-40ac-aae0-354c848c06d3`, "John Duplicate Test") was resolved on 2026-10-01 to verify the fix.
 - `/app/operations` still uses `analytics()`, `workloadReport()`, `slaViolations()` and `auditLogs()`; the Desk no longer does.
 - Desk "Open" and "Pending" are the queue right now; the Time choice applies to new, resolved, speed, automation and ratings.

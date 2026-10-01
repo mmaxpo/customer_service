@@ -175,7 +175,7 @@ export default function ConnectionsScreen() {
           description="The chat bubble on your store. Customers get answers from your workflows, or reach your team."
           status={widget?.enabled ? <ToneChip tone="commerce">On</ToneChip> : <ToneChip tone="neutral">Off</ToneChip>}
         >
-          <Link href="/app/chatbot" className="mt-1.5 inline-block text-[13px] font-medium text-primary hover:underline">
+          <Link href="/app/settings/chat-widget" className="mt-1.5 inline-block text-[13px] font-medium text-primary hover:underline">
             Install code, look and greeting
           </Link>
         </Row>
