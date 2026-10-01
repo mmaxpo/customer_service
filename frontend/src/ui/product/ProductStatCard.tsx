@@ -17,15 +17,15 @@ export function ProductStatCard({
   className,
 }: Props) {
   return (
-    <div className={cn("rounded-2xl border border-slate-200 bg-white p-5 shadow-sm", className)}>
+    <div className={cn("rounded-2xl border border-border bg-surface p-5 shadow-sm", className)}>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm text-slate-500">{label}</div>
-          <div className="mt-1 text-2xl font-bold text-slate-950">{value}</div>
+          <div className="text-sm text-text-secondary">{label}</div>
+          <div className="mt-1 text-2xl font-bold text-foreground">{value}</div>
         </div>
-        {Icon && <Icon className="text-slate-400" size={22} />}
+        {Icon && <Icon className="text-text-secondary" size={22} />}
       </div>
-      {description && <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>}
+      {description && <p className="mt-3 text-sm leading-6 text-text-secondary">{description}</p>}
     </div>
   );
 }

@@ -57,9 +57,9 @@ export default function BillingPage() {
           </div>
           <ProductPanel title="Choose a plan" description="Start with a trial and upgrade when Tajeran is handling real customer conversations.">
             <div className="grid gap-4 md:grid-cols-3">
-              {plans.map((plan) => <div key={plan.id} className="rounded-2xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><h3 className="font-semibold text-slate-950">{plan.name}</h3><span className="text-sm font-bold text-slate-700">{plan.price}</span></div><p className="mt-2 min-h-12 text-sm leading-6 text-slate-600">{plan.description}</p><button onClick={() => choosePlan(plan.id)} disabled={busy !== null} className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{busy === plan.id ? "Opening Shopify..." : "Choose plan"}</button></div>)}
+              {plans.map((plan) => <div key={plan.id} className="rounded-2xl border border-border bg-surface p-5"><div className="flex items-center justify-between"><h3 className="font-semibold text-foreground">{plan.name}</h3><span className="text-sm font-bold text-text-secondary">{plan.price}</span></div><p className="mt-2 min-h-12 text-sm leading-6 text-text-secondary">{plan.description}</p><button onClick={() => choosePlan(plan.id)} disabled={busy !== null} className="mt-5 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{busy === plan.id ? "Opening Shopify..." : "Choose plan"}</button></div>)}
             </div>
-            {subscription?.status === "active" && <button onClick={openPortal} className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800">Manage subscription</button>}
+            {subscription?.status === "active" && <button onClick={openPortal} className="mt-5 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-foreground">Manage subscription</button>}
           </ProductPanel>
         </>
       )}

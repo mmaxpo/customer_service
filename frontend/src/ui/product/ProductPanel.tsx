@@ -21,18 +21,18 @@ export function ProductPanel({
   contentClassName,
 }: Props) {
   return (
-    <section className={cn("overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70", className)}>
+    <section className={cn("overflow-hidden rounded-3xl border border-border bg-surface shadow-sm shadow-slate-200/70", className)}>
       {(title || description || icon || action) && (
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
+        <div className="flex items-start justify-between gap-4 border-b border-border p-5">
           <div className="flex min-w-0 items-start gap-3">
             {icon && (
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-white">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              {title && <h2 className="font-bold text-slate-950">{title}</h2>}
-              {description && <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>}
+              {title && <h2 className="font-bold text-foreground">{title}</h2>}
+              {description && <p className="mt-1 text-sm leading-6 text-text-secondary">{description}</p>}
             </div>
           </div>
           {action}

@@ -214,7 +214,7 @@ export default function RoutingPage() {
 
       {isLoading ? (
         <ProductPanel>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-text-secondary">
             <Loader2 className="animate-spin" size={16} />
             Loading routing workspace...
           </div>
@@ -240,14 +240,14 @@ export default function RoutingPage() {
                   agents.map((agent) => (
                     <div
                       key={agent.id}
-                      className="rounded-2xl border border-slate-200 bg-white p-4"
+                      className="rounded-2xl border border-border bg-surface p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="font-semibold text-slate-950">
+                          <div className="font-semibold text-foreground">
                             {agent.display_name}
                           </div>
-                          <div className="mt-1 text-sm text-slate-500">
+                          <div className="mt-1 text-sm text-text-secondary">
                             {agent.email || "No email"}
                           </div>
                         </div>
@@ -260,7 +260,7 @@ export default function RoutingPage() {
 
                       <div className="mt-3 flex flex-wrap gap-2">
                         {agent.skills.slice(0, 5).map((skill) => (
-                          <span key={skill} className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                          <span key={skill} className="rounded-full bg-muted px-2 py-1 text-xs text-text-secondary">
                             {skill}
                           </span>
                         ))}
@@ -280,11 +280,11 @@ export default function RoutingPage() {
                   <ProductNotice>No teams created yet.</ProductNotice>
                 ) : (
                   teams.map((team) => (
-                    <div key={team.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div key={team.id} className="rounded-2xl border border-border bg-surface p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="font-semibold text-slate-950">{team.name}</div>
-                          <div className="mt-1 text-sm text-slate-500">
+                          <div className="font-semibold text-foreground">{team.name}</div>
+                          <div className="mt-1 text-sm text-text-secondary">
                             {team.description || "No description"}
                           </div>
                         </div>
@@ -305,11 +305,11 @@ export default function RoutingPage() {
                   <ProductNotice>No queues created yet.</ProductNotice>
                 ) : (
                   queues.map((queue) => (
-                    <div key={queue.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div key={queue.id} className="rounded-2xl border border-border bg-surface p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="font-semibold text-slate-950">{queue.name}</div>
-                          <div className="mt-1 text-sm text-slate-500">
+                          <div className="font-semibold text-foreground">{queue.name}</div>
+                          <div className="mt-1 text-sm text-text-secondary">
                             {queue.description || "No description"}
                           </div>
                         </div>
@@ -336,11 +336,11 @@ export default function RoutingPage() {
                   <ProductNotice>No routing policies created yet.</ProductNotice>
                 ) : (
                   policies.map((policy) => (
-                    <div key={policy.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div key={policy.id} className="rounded-2xl border border-border bg-surface p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="font-semibold text-slate-950">{policy.name}</div>
-                          <div className="mt-1 text-sm text-slate-500">
+                          <div className="font-semibold text-foreground">{policy.name}</div>
+                          <div className="mt-1 text-sm text-text-secondary">
                             {policy.strategy.replaceAll("_", " ")} · rank {policy.priority_rank}
                           </div>
                         </div>
@@ -369,10 +369,10 @@ export default function RoutingPage() {
                 ["Agent-aware", "Availability, skills, team membership, and capacity control assignment."],
                 ["Workflow-aware", "Some requests can go to automation first, then human approval only when needed."],
               ].map(([title, body]) => (
-                <div key={title} className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
-                  <Workflow className="text-purple-700" size={18} />
-                  <div className="mt-3 font-semibold text-purple-950">{title}</div>
-                  <p className="mt-2 text-sm leading-6 text-purple-800">{body}</p>
+                <div key={title} className="rounded-2xl border border-ai-100 bg-ai-50 p-4">
+                  <Workflow className="text-ai-accent" size={18} />
+                  <div className="mt-3 font-semibold text-ai-accent">{title}</div>
+                  <p className="mt-2 text-sm leading-6 text-ai-accent">{body}</p>
                 </div>
               ))}
             </div>

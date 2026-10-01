@@ -4,10 +4,10 @@ import { cn } from "@/platform/utils";
 type Variant = "default" | "success" | "warning" | "danger" | "info";
 
 const variants: Record<Variant, string> = {
-  default: "border-slate-200 bg-white text-slate-700",
-  success: "border-emerald-100 bg-emerald-50 text-emerald-800",
-  warning: "border-amber-100 bg-amber-50 text-amber-800",
-  danger: "border-red-100 bg-red-50 text-red-700",
+  default: "border-border bg-surface text-text-secondary",
+  success: "border-shopify-100 bg-shopify-50 text-shopify-700",
+  warning: "border-warn-100 bg-warn-50 text-warn-700",
+  danger: "border-danger/30 bg-danger/10 text-danger",
   info: "border-ai-100 bg-ai-50 text-ai-800",
 };
 

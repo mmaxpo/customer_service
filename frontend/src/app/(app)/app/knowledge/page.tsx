@@ -230,18 +230,18 @@ export default function KnowledgePage() {
                 <ProductNotice>No search results yet.</ProductNotice>
               ) : (
                 results.map((result) => (
-                  <div key={result.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div key={result.id} className="rounded-2xl border border-border bg-surface p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-medium text-slate-500">
+                      <div className="text-xs font-medium text-text-secondary">
                         {result.doc_id} · chunk {result.chunk_index ?? 0}
                       </div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-text-secondary">
                         {typeof result.score_hybrid === "number"
                           ? `score ${result.score_hybrid.toFixed(3)}`
                           : "hybrid"}
                       </div>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                    <p className="mt-3 text-sm leading-6 text-text-secondary">
                       {result.content}
                     </p>
                   </div>
@@ -255,7 +255,7 @@ export default function KnowledgePage() {
             description="These documents power AI reply composition, suggested actions, and workflow decisions."
           >
             {isLoadingDocs ? (
-              <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <Loader2 className="animate-spin" size={16} />
                 Loading docs...
               </div>
@@ -266,11 +266,11 @@ export default function KnowledgePage() {
                 {docs.map((doc) => (
                   <div
                     key={doc.doc_id}
-                    className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4"
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-surface p-4"
                   >
                     <div className="min-w-0">
-                      <div className="truncate font-semibold text-slate-950">{doc.doc_id}</div>
-                      <div className="mt-1 text-sm text-slate-500">
+                      <div className="truncate font-semibold text-foreground">{doc.doc_id}</div>
+                      <div className="mt-1 text-sm text-text-secondary">
                         {doc.chunks ?? 0} chunks · updated {formatDate(doc.updated_at)}
                       </div>
                     </div>

@@ -185,6 +185,13 @@ Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/b
 
 ---
 
+## 3b. Colours and themes (2026-10-01, **not committed yet**)
+- Light theme = "warm neutral" (owner's choice B): page `#efece6`, borders `#d3ccbf`, text `#211e1a`; brand blue and AI purple unchanged. Dark theme (choice D) is a second set of the same tokens under `[data-theme="dark"]` in `src/app/globals.css`.
+- Switch: Settings tabs row → "Dark mode / Light mode" (`domains/workspace/ThemeSwitch.tsx`). The choice is stored in the browser (`localStorage` key `tajeran-theme`), not on the account; an inline script in `src/app/layout.tsx` applies it before first paint.
+- Rule for new UI: use the tokens (`bg-surface`, `bg-background`, `bg-muted`, `border-border`, `text-foreground`, `text-text-secondary`, `text-primary`, `bg-ai-50`, `bg-warn-50`, …), never `bg-white` / `text-slate-*`, or the screen won't follow the theme. Settings, Knowledge, Routing, Billing, the Desk page and `ui/product/*` were converted.
+- Inbox separation (committed `aebc0886`): tinted list and customer panel, white case area, tinted case header; customer / Tajeran / team / note entries each have their own colour.
+- Not converted (still fixed colours): the unused `AppSidebar`, the logo mark, the old mission-board and builder screens, public and auth pages, and the chat widget on the store.
+
 ## 4. Known gaps worth remembering
 - Reply language: after a German message, an English follow-up is still answered in German, even with the tightened rule (`48bc56ad`). Rare; not fixed.
 - The job worker only loads code when it starts. Production deploys restart it, so this is a development-only chore; `watchfiles` is installed, so the worker could be started with auto-reload in development.

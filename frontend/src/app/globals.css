@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-    --color-background: #f5f7fb;
-    --color-foreground: #102033;
-    --color-muted: #eef4fb;
-    --color-muted-foreground: #64748b;
-    --color-border: #d9e4f2;
+    /* Light theme: warm neutral page and borders, so the blue and purple accents stand out. */
+    --color-background: #efece6;
+    --color-foreground: #211e1a;
+    --color-muted: #ebe7df;
+    --color-muted-foreground: #6b655b;
+    --color-border: #d3ccbf;
     --color-primary: #2446a6;
     --color-primary-foreground: #ffffff;
 
@@ -39,7 +40,7 @@
        inbox, AppHeader/AppSidebar) and are intentionally left untouched. */
     --color-surface: #ffffff;
     --color-surface-elevated: #ffffff;
-    --color-text-secondary: #475569;
+    --color-text-secondary: #5d574d;
 
     --color-primary-hover: #1b3a8a;
     --color-focus: var(--color-primary);
@@ -63,6 +64,47 @@
     --shadow-elevated: 0 8px 24px -4px rgba(15, 23, 42, 0.12), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
 
     --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark theme, switched on from Settings (data-theme on <html>). Only the
+   colour values change; every screen that uses the tokens follows. */
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-background: #0e1522;
+    --color-foreground: #e6ecf5;
+    --color-muted: #202c44;
+    --color-muted-foreground: #9db0c9;
+    --color-border: #2b3a55;
+    --color-primary: #4f74e3;
+    --color-primary-foreground: #ffffff;
+    --color-primary-hover: #6a8bec;
+
+    --color-surface: #172033;
+    --color-surface-elevated: #1c2740;
+    --color-text-secondary: #9db0c9;
+
+    --color-tajeran-50: #18233c;
+    --color-tajeran-100: #1f2e50;
+    --color-tajeran-200: #2c4175;
+    --color-tajeran-500: #7396f7;
+    --color-tajeran-700: #9db6fa;
+    --color-tajeran-950: #e3ecff;
+
+    --color-ai-50: #2a2247;
+    --color-ai-100: #44357a;
+    --color-ai-700: #c7b4ff;
+    --color-ai-950: #ece0ff;
+
+    --color-shopify-50: #0f2a22;
+    --color-shopify-100: #17493a;
+    --color-shopify-700: #5fd3a6;
+
+    --color-warn-50: #33290f;
+    --color-warn-100: #5a4514;
+    --color-warn-700: #e0a63a;
+
+    --color-danger: #f87171;
 }
 
 body {

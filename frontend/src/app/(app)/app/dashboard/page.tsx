@@ -25,7 +25,7 @@ export default function DashboardPage() {
   const Report = tabs.find((item) => item.id === tab)!.Report;
 
   return (
-    <div className="min-h-full bg-[#f8f9fa] text-foreground">
+    <div className="min-h-full bg-background text-foreground">
       <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Below lg the app header already shows the page title. */}

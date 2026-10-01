@@ -100,12 +100,7 @@ export default function InboxRoot({ queue, caseFile, composer }: InboxRootProps)
 
   return (
     <MotionConfig reducedMotion="user">
-      {/* Stronger separation, Inbox only for now: a darker page tint and firmer
-          borders so the list, the case and the customer panel read as three parts. */}
-      <div
-        className="flex h-full min-h-0 bg-surface"
-        style={{ "--color-background": "#e6ecf5", "--color-border": "#bccadf", "--color-muted": "#e3ebf6" } as React.CSSProperties}
-      >
+      <div className="flex h-full min-h-0 bg-surface">
         <aside
           aria-label="Conversation queue"
           className={cn(
