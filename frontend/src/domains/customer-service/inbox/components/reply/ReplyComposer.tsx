@@ -1,5 +1,6 @@
 "use client";
 
+import { useTeammates } from "@/domains/customer-service/collaboration/useTeammates";
 import { useRef, useState } from "react";
 import { ChevronRight, FileText, LoaderCircle, Paperclip, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -121,6 +122,7 @@ export function ReplyComposer({
   isUploading,
 }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const teammates = useTeammates();
   const [macrosOpen, setMacrosOpen] = useState(false);
   const [aiToolsOpen, setAiToolsOpen] = useState(false);
   const isNote = composerMode === "note";
@@ -188,6 +190,21 @@ export function ReplyComposer({
           rows={3}
           className="block max-h-60 min-h-20 w-full resize-y bg-transparent px-3 py-2.5 text-[14px] leading-6 text-foreground outline-none placeholder:text-text-secondary"
         />
+        {isNote && teammates && teammates.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-3 py-2 text-[12px] text-text-secondary">
+            Mention:
+            {teammates.map((member) => (
+              <button
+                key={member.user_id}
+                type="button"
+                onClick={() => setInternalNoteText(`${internalNoteText}${internalNoteText && !internalNoteText.endsWith(" ") ? " " : ""}@${member.name} `)}
+                className="rounded-full border border-border bg-surface px-2 py-0.5 text-[12px] font-medium text-foreground hover:bg-muted"
+              >
+                @{member.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {attachments.length ? (
           <ul className="flex flex-wrap gap-1.5 border-t border-border px-3 py-2" aria-label="Attachments">
             {attachments.map((file) => (

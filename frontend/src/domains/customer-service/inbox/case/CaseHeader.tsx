@@ -6,7 +6,7 @@ import { ArrowLeft, Check, ChevronDown, Ellipsis, PanelRight } from "lucide-reac
 
 import { customerServiceApi } from "@/domains/customer-service/api";
 import type { Agent, ConversationContext, ConversationDetail } from "@/domains/customer-service/model";
-import { workspaceApi } from "@/domains/workspace/api/workspace";
+import { useTeammates } from "@/domains/customer-service/collaboration/useTeammates";
 import { apiErrorMessage } from "@/platform/api/client";
 import { Events, usePublish } from "@/platform/events";
 import { cn } from "@/platform/utils";
@@ -36,7 +36,6 @@ type Props = {
 export function CaseHeader({ conversation, context, state, onBack, onOpenContext, onDelete, deleting }: Props) {
   const publish = usePublish();
   const [error, setError] = useState<string | null>(null);
-  const [agents, setAgents] = useState<Pick<Agent, "agent_user_id" | "display_name" | "email">[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
 
@@ -47,25 +46,8 @@ export function CaseHeader({ conversation, context, state, onBack, onOpenContext
   const openSla = context?.sla.open[0] ?? null;
   const snoozedUntil = typeof context?.conversation.snoozed_until === "string" ? context.conversation.snoozed_until : null;
 
-  useEffect(() => {
-    let active = true;
-    // Assignees are the workspace's real team members.
-    void workspaceApi.current()
-      .then((workspace) => workspaceApi.team(workspace.id))
-      .then((team) => {
-        if (active) {
-          setAgents(team.filter((member) => (member.state ?? member.status) === "active" && member.user_id).map((member) => ({
-            agent_user_id: member.user_id,
-            display_name: member.display_name ?? null,
-            email: member.email ?? null,
-          })));
-        }
-      })
-      .catch(() => {
-        // The unassigned action remains available when the team can't be loaded.
-      });
-    return () => { active = false; };
-  }, []);
+  // Assignees are the workspace's real team members.
+  const agents = (useTeammates() ?? []).map((member) => ({ agent_user_id: member.user_id, display_name: member.name, email: member.email }));
 
   const changed = () => publish({ type: Events.ConversationChanged, payload: { conversationId: conversation.id } });
 

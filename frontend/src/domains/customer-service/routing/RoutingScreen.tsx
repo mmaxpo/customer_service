@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { TOPIC_LABELS } from "@/domains/customer-service/model/topics";
-import { workspaceApi, type WorkspaceMember } from "@/domains/workspace/api/workspace";
+import type { Teammate } from "@/domains/customer-service/collaboration/useTeammates";
 import { apiErrorMessage, apiJson, jsonBody } from "@/platform/api/client";
 import { Button } from "@/ui/primitives/button";
 
@@ -18,19 +18,16 @@ const select = "h-9 min-w-0 rounded-control border border-border bg-surface px-2
 
 /** Who gets what: a topic goes to one person; everything else has one rule. */
 export default function RoutingScreen() {
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [members, setMembers] = useState<Teammate[]>([]);
   const [rules, setRules] = useState<Rules | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      workspaceApi.current().then((workspace) => workspaceApi.team(workspace.id)),
-      apiJson<Rules>(ENDPOINT),
-    ])
+    Promise.all([apiJson<Teammate[]>("/api/customer-service/studio/teammates"), apiJson<Rules>(ENDPOINT)])
       .then(([team, saved]) => {
-        setMembers(team.filter((member) => (member.state ?? member.status) === "active" && member.user_id));
+        setMembers(team);
         setRules(saved);
       })
       .catch((err) => setError(apiErrorMessage(err, "Could not load the routing rules.")));
@@ -49,7 +46,7 @@ export default function RoutingScreen() {
   const usedTopics = new Set(rules.topics.map((rule) => rule.topic));
   const freeTopic = Object.keys(TOPIC_LABELS).find((topic) => !usedTopics.has(topic));
   const people = members.map((member) => (
-    <option key={member.user_id} value={member.user_id}>{member.display_name || member.email}</option>
+    <option key={member.user_id} value={member.user_id}>{member.name}</option>
   ));
 
   async function save(event: FormEvent) {

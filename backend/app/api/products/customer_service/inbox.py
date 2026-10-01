@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Header, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import get_db
+from app.domains.customer_service.services.collaboration import CollaborationService
 from app.domains.customer_service.inbox.schemas import (
     InboundEmailIngestResult,
     NormalizedInboundEmail,
@@ -132,6 +133,15 @@ async def update_ticket(
 
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if payload.assigned_to:
+        await CollaborationService(db).notify_assignment(
+            workspace_id=current_user.id,
+            actor_id=getattr(current_user, "actor_user_id", current_user.id),
+            conversation_id=ticket.conversation_id,
+            assignee=payload.assigned_to,
+        )
+        await db.refresh(ticket)
 
     return ticket
 

@@ -1,3 +1,4 @@
+import TeamNotice from "@/domains/customer-service/collaboration/TeamNotice";
 import HandoffNotice from "@/domains/customer-service/live/HandoffNotice";
 
 import AppHeader from "./AppHeader";
@@ -15,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <AppMain>{children}</AppMain>
         <MobileNav />
         <HandoffNotice />
+        <TeamNotice />
       </div>
     </div>
   );

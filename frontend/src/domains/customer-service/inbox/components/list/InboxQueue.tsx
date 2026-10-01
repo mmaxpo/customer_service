@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 
 import type { InboxFolder, InboxItem } from "@/domains/customer-service/model";
 import { customerServiceApi } from "@/domains/customer-service/api";
+import { authApi } from "@/platform/api";
 import { apiErrorMessage } from "@/platform/api/client";
 import { cn } from "@/platform/utils";
 
@@ -25,6 +26,7 @@ const FOLDERS: { value: InboxFolder; label: string }[] = [
 const URGENT = new Set(["high", "urgent"]);
 const VIEWS = [
   { value: "all", label: "All cases" },
+  { value: "mine", label: "Mine" },
   { value: "unassigned", label: "Unassigned" },
   { value: "open", label: "Open" },
   { value: "pending", label: "Pending" },
@@ -109,6 +111,12 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
     [waiting],
   );
 
+  // The signed-in person, for the "Mine" view.
+  const [myId, setMyId] = useState<string | null>(null);
+  useEffect(() => {
+    authApi.me().then((user: { id?: string }) => setMyId(user.id ?? null)).catch(() => {});
+  }, []);
+
   // The Automations page links here with ?view=unanswered.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("view") === "unanswered") setView("unanswered");
@@ -126,6 +134,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
     return items.filter((item) => {
       const ticketStatus = lower(item.ticket?.status || item.status);
       const priority = lower(item.ticket?.priority);
+      if (view === "mine" && item.ticket?.assigned_to !== myId) return false;
       if (view === "unassigned" && item.ticket?.assigned_to) return false;
       if (view === "open" && ticketStatus !== "open") return false;
       if (view === "pending" && ticketStatus !== "pending") return false;
@@ -141,7 +150,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
         .toLowerCase()
         .includes(needle);
     });
-  }, [items, query, urgentOnly, view, topic, unanswered]);
+  }, [items, query, urgentOnly, view, topic, unanswered, myId]);
 
   const topics = useMemo(
     () => [...new Set(items.map((item) => item.topic).filter((value): value is string => Boolean(value)))].sort(),
@@ -151,6 +160,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
   const viewCounts = useMemo(() => {
     const counts: Record<QueueView, number> = {
       all: items.length,
+      mine: myId ? items.filter((item) => item.ticket?.assigned_to === myId).length : 0,
       unassigned: items.filter((item) => !item.ticket?.assigned_to).length,
       open: items.filter((item) => lower(item.ticket?.status || item.status) === "open").length,
       pending: items.filter((item) => lower(item.ticket?.status || item.status) === "pending").length,
@@ -159,7 +169,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
       unanswered: items.filter((item) => unanswered.has(item.conversation_id)).length,
     };
     return counts;
-  }, [items, unanswered]);
+  }, [items, unanswered, myId]);
 
   const moveSelection = (direction: 1 | -1) => {
     if (visible.length === 0) return;

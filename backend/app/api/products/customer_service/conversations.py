@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.workflows import get_event_sink, get_run_store
 from app.core.session import get_db
+from app.domains.customer_service.services.collaboration import CollaborationService
 from app.domains.customer_service.schemas.agent_assist import (
     AgentAssistSuggestionRead,
     AgentAssistSuggestionRevisionRead,
@@ -115,7 +116,7 @@ async def get_conversation_detail(
 async def delete_conversation(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_customer_service_permission("cs.conversations.delete")),
 ):
     deleted = await InboxService(db).delete_conversation(
         user_id=current_user.id,
@@ -151,12 +152,21 @@ async def add_internal_note(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    return await InternalNoteService(db).add_note(
+    actor_id = getattr(current_user, "actor_user_id", current_user.id)
+    note = await InternalNoteService(db).add_note(
         user_id=current_user.id,
-        actor_id=getattr(current_user, "actor_user_id", current_user.id),
+        actor_id=actor_id,
         conversation_id=conversation_id,
         payload=payload,
     )
+    # "@Name" in a note tells that teammate.
+    await CollaborationService(db).notify_mentions(
+        workspace_id=current_user.id,
+        actor_id=actor_id,
+        conversation_id=conversation_id,
+        body=payload.body,
+    )
+    return note
 
 
 @conversations_router.get(

@@ -16,6 +16,7 @@ from app.domains.customer_service.services.automation_studio import (
 from app.domains.customer_service.services.conversation_translation import (
     ConversationTranslationService,
 )
+from app.domains.customer_service.services.collaboration import CollaborationService
 from app.domains.customer_service.services.desk_insights import DeskInsightsService
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
 from app.domains.customer_service.services.unanswered_topics import (
@@ -236,6 +237,14 @@ async def save_assignment_rules(
         topics=[rule.model_dump() for rule in payload.topics],
         default=payload.default,
     )
+
+
+@studio_router.get("/teammates")
+async def teammates(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.conversations.read")),
+):
+    return await CollaborationService(db).teammates(workspace_id=current_user.id)
 
 
 @studio_router.get("/node-library")
