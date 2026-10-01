@@ -133,6 +133,49 @@ class RealShopifyProvider:
             draft_nodes[0], shop_domain=shop_domain
         )
 
+    async def list_orders_since(
+        self, *, shop_domain: str, access_token: str | None, since: str
+    ) -> list[dict]:
+        """Orders created since an ISO time: name, time, email and total only."""
+        self._require_access_token(access_token)
+        orders: list[dict] = []
+        cursor = None
+        for _ in range(10):  # at most 2,500 orders
+            payload = await self._graphql_request(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                query="""
+                    query OrdersSince($query: String!, $cursor: String) {
+                      orders(first: 250, after: $cursor, query: $query) {
+                        nodes {
+                          name createdAt email cancelledAt
+                          currentTotalPriceSet { shopMoney { amount currencyCode } }
+                        }
+                        pageInfo { hasNextPage endCursor }
+                      }
+                    }
+                """,
+                variables={"query": f"created_at:>='{since}'", "cursor": cursor},
+            )
+            page = (payload.get("data") or {}).get("orders") or {}
+            for node in page.get("nodes") or []:
+                money = (node.get("currentTotalPriceSet") or {}).get("shopMoney") or {}
+                orders.append(
+                    {
+                        "name": node.get("name"),
+                        "created_at": node.get("createdAt"),
+                        "email": node.get("email"),
+                        "cancelled": bool(node.get("cancelledAt")),
+                        "amount": money.get("amount"),
+                        "currency": money.get("currencyCode"),
+                    }
+                )
+            info = page.get("pageInfo") or {}
+            if not info.get("hasNextPage"):
+                break
+            cursor = info.get("endCursor")
+        return orders
+
     async def list_knowledge_content(
         self, *, shop_domain: str, access_token: str | None
     ) -> list[dict]:

@@ -363,6 +363,23 @@ class ShopifyService:
         order_read["summary"] = self._order_ai_summary(order_read)
         return order_read
 
+    async def list_orders_since(self, *, user_id, since: str) -> list[dict] | None:
+        """Orders created since an ISO time, straight from Shopify. None when
+        no store is connected or the provider can't list orders."""
+        connection = await self._resolve_connection(user_id=user_id)
+        list_orders = getattr(self.provider, "list_orders_since", None)
+        if connection is None or connection.reauth_required_at is not None or list_orders is None:
+            return None
+        return await default_gateway.call(
+            provider="shopify",
+            operation="list_orders_since",
+            func=lambda: list_orders(
+                shop_domain=connection.shop_domain,
+                access_token=decrypt_secret(connection.access_token_encrypted),
+                since=since,
+            ),
+        )
+
     async def get_order_fresh(
         self,
         *,

@@ -6,6 +6,7 @@ screens always agree.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -13,8 +14,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
+from app.domains.customer_service.services.shopify import ShopifyService
 from app.tenancy.models import Workspace
 from app.tenancy.working_calendar import reply_due_at, resolved_workspace_calendar
+
+logger = logging.getLogger(__name__)
+
+SALES_WINDOW_DAYS = 3
 
 
 def _automation(rows: list[dict]) -> dict:
@@ -96,6 +102,54 @@ class DeskInsightsService:
             "speed": await self._speed(workspace_id, start, now),
             "speed_previous": await self._speed(workspace_id, previous_start, start),
             "tickets": await self._tickets(workspace_id, start),
+            "sales_after_support": await self._sales_after_support(workspace_id, start),
+        }
+
+    async def _sales_after_support(self, workspace_id: UUID, start: datetime) -> dict | None:
+        """Shopify orders placed within three days after the same customer
+        (matched by email) wrote to support. None when Shopify can't be read."""
+        result = await self.db.execute(
+            text(
+                """
+                SELECT lower(cust.email) AS email, m.created_at
+                FROM cs_conversation_messages m
+                JOIN cs_conversations c ON c.id = m.conversation_id
+                JOIN cs_customers cust ON cust.id = c.customer_id
+                WHERE c.user_id = :workspace_id AND cust.email IS NOT NULL
+                  AND lower(m.sender_type::text) = 'customer' AND m.created_at >= :start
+                """
+            ),
+            {"workspace_id": workspace_id, "start": start},
+        )
+        chats: dict[str, list[datetime]] = {}
+        for email, created_at in result:
+            chats.setdefault(email, []).append(created_at)
+        if not chats:
+            return {"orders": 0, "revenue": 0.0, "currency": None}
+
+        try:
+            orders = await ShopifyService(self.db).list_orders_since(
+                user_id=workspace_id, since=start.isoformat()
+            )
+        except Exception:
+            logger.exception("Desk: could not read Shopify orders for %s", workspace_id)
+            return None
+        if orders is None:
+            return None
+
+        window = timedelta(days=SALES_WINDOW_DAYS)
+        matched = []
+        for order in orders:
+            email = (order.get("email") or "").lower()
+            if order["cancelled"] or email not in chats or not order.get("created_at"):
+                continue
+            placed_at = datetime.fromisoformat(order["created_at"].replace("Z", "+00:00"))
+            if any(timedelta(0) <= placed_at - chat_at <= window for chat_at in chats[email]):
+                matched.append(order)
+        return {
+            "orders": len(matched),
+            "revenue": round(sum(float(order["amount"] or 0) for order in matched), 2),
+            "currency": matched[0]["currency"] if matched else None,
         }
 
     async def _tickets(self, workspace_id: UUID, start: datetime) -> dict:

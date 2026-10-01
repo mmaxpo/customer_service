@@ -56,6 +56,8 @@ export type Insights = {
   top_topics: { topic: string; conversations: number }[];
   speed: Speed;
   speed_previous: Speed;
+  // Null when Shopify isn't connected or couldn't be read.
+  sales_after_support: { orders: number; revenue: number; currency: string | null } | null;
   lowest_rated: { conversation_id: string; score: number; comment: string | null; answered_at: string; customer_name: string | null }[];
 };
 
@@ -119,15 +121,24 @@ const percent = (value: number | null) => (value === null ? "—" : `${value}%`)
 
 export function AutomationReport({ data }: { data: Insights }) {
   const { days } = data;
-  const { automation: now, automation_previous: before, answer_feedback: feedback } = data;
+  const { automation: now, automation_previous: before, answer_feedback: feedback, sales_after_support: sales } = data;
 
   return (
     <>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`mt-5 grid gap-3 sm:grid-cols-2 ${sales ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
         <Stat label="Answered automatically" value={percent(now.answered_rate)} hint={change(now.answered_rate, before.answered_rate, " pts", days)} />
         <Stat label="Handed to your team" value={percent(now.handed_over_rate)} hint={change(now.handed_over_rate, before.handed_over_rate, " pts", days)} />
         <Stat label="Failed" value={percent(now.failed_rate)} hint={change(now.failed_rate, before.failed_rate, " pts", days)} />
         <Stat label="Conversations handled" value={String(now.total)} hint={change(now.total, before.total || null, "", days)} />
+        {sales ? (
+          <Stat
+            label="Orders after a support chat"
+            value={sales.orders && sales.currency
+              ? `${sales.orders} · ${new Intl.NumberFormat(undefined, { style: "currency", currency: sales.currency }).format(sales.revenue)}`
+              : String(sales.orders)}
+            hint="Placed within 3 days of the customer's message"
+          />
+        ) : null}
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <section className="rounded border border-border bg-surface p-5">

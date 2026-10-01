@@ -70,7 +70,7 @@ Built on 2026-10-01 (all verified live through the public chat API, 14/14 correc
 
 Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
-Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget as `a8af91bb`; the logo and reply-target rows are **not committed yet**, ask the owner):
+Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget as `a8af91bb`; the logo and reply target as `aa6aa0e9`; the sales row is **not committed yet**, ask the owner):
 
 | Behaviour | Where |
 |---|---|
@@ -85,6 +85,7 @@ Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3
 | Chat widget logo: upload in Settings → Chat widget (PNG / JPG / WebP, up to 200 KB), stored as a data URL in the widget settings under `meta.logo`, shown in the chat header instead of "AI" | `ChatWidgetScreen.tsx`, `_logo` in `channels.py`, `tajeran-chat-widget.js`. The file picker itself was not exercised (the agent browser can't choose files); the logo was saved through the API and seen in the tab and the widget. |
 | Reply-time target + weekly schedule: Settings → Workspace has "First reply target (minutes)" and, for "Weekly schedule", one opening period per day. Stored in `workspaces.business_hours` (`reply_target_minutes`, `weekly_hours`). The mode value sent is now `scheduled` (the old form sent `weekly`, which the API rejects) | `src/app/(app)/app/settings/page.tsx`; `normalize_working_calendar` and `reply_due_at` in `backend/app/tenancy/working_calendar.py` |
 | Target shown in the app: each waiting conversation gets `reply_due_at` and `target_state` (`on_track` / `close` = last quarter of the allowed time / `missed`), counted in business hours from the customer's last message. Live → Now and the Inbox list show "Reply due in X min" or "Reply target missed"; Desk → Speed shows "Answered within target" (first reply by bot or person; unanswered past due counts as late) | `_waiting_for_person` in `live_monitor.py`, `_speed` in `desk_insights.py`, `live/ReplyTargetChip.tsx`, `LiveNowScreen.tsx`, `InboxQueue.tsx`, `DeskReports.tsx` |
+| Desk → Automation tile "Orders after a support chat: N · $X": Shopify orders (not cancelled) created within 3 days after a customer message, matched by the customer's email, for the chosen period. Read live from Shopify on each Desk load (about 1.5 s); the tile is hidden when Shopify isn't connected or the call fails. The local `cs_shopify_order_cache` only holds orders someone looked up, so it can't be used for this | `_sales_after_support` in `desk_insights.py`, `list_orders_since` in `services/shopify.py` and `integrations/shopify/real_provider.py`, `AutomationReport` in `DeskReports.tsx` |
 
 Work up to v22 is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
@@ -146,10 +147,12 @@ Original task: Settings → Chat widget tab + self-service buttons
 Original task: Reply-time targets + business hours
 Settings → Workspace: "First reply within X, during business hours" plus the weekly schedule (the tab already has a Business hours setting; an SLA backend exists, see `customerServiceApi.slaViolations` and `backend/.claude/features/basic-sla.md`). Show "close to missing the target" in Live → Now, "% answered within target" in Desk, and a small timer on inbox cases near the target.
 
-### Task 8: NEXT. Sales influenced by support
+### Task 8: DONE (see section 2)
+
+Original task: Sales influenced by support
 Desk: "Orders placed within 3 days after a support chat: N · $X" from Shopify order data matched to the chat's customer. Check what order data is stored locally before calling Shopify.
 
-### Task 9: Unanswered-topic suggestions (uses AI)
+### Task 9: NEXT (needs Task 10's create-from-prompt for "Review draft", or the owner's call). Unanswered-topic suggestions (uses AI)
 Cluster customer messages from the last 7 days that no workflow answered (outcome handed over / no workflow). At 3+ in a cluster, show a card above the workflows ("Customers asked about gift wrapping 18 times this week") with Review draft / Dismiss, and "Questions your help articles don't answer" on the Knowledge page. "Review draft" needs Task 10's create-from-prompt, so either do Task 10 first or ask the owner.
 
 ### Task 10: Answers in the customer's language (uses AI)
@@ -162,6 +165,8 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 ---
 
 ## 4. Known gaps worth remembering
+- "Orders after a support chat" shows 3 · $145 in the dev workspace. Those are test orders #1006–#1008, whose Shopify creation time is about 90 seconds after the first test chat (clock difference), so the match is a test-data artifact, not real influenced sales.
+- "Track my order" reads the cached order when there is one; the cache is refreshed by Shopify webhooks, which don't reach localhost, so a status can be stale in development.
 - The dev workspace now has a 60-minute reply target (24/7), set during testing on 2026-10-01; most old test conversations show "Reply target missed".
 - The weekly schedule editor keeps one opening period per day; a day saved elsewhere with several periods would be reduced to the first on save. Holidays have no UI.
 - Because the bot answers in seconds, "Answered within target" is close to 100%; the target matters mostly for conversations waiting for a person.
