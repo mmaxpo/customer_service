@@ -79,7 +79,7 @@ export function CaseHeader({ conversation, context, state, onBack, onOpenContext
   };
 
   return (
-    <header className="shrink-0 border-b border-border bg-surface px-4 py-3 sm:px-5">
+    <header className="shrink-0 border-b border-border bg-muted px-4 py-3 sm:px-5">
       <div className="flex items-start gap-3">
         {onBack ? (
           <button

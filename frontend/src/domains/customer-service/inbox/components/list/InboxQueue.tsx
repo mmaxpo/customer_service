@@ -55,7 +55,7 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
   const waiting = useWaitingForPerson()?.find((row) => row.conversation_id === item.conversation_id);
 
   return (
-    <div className={cn("relative border-b border-border", selected && "bg-primary/[0.06]")}>
+    <div className={cn("relative border-b border-border", selected && "bg-surface")}>
       <input
         type="checkbox"
         aria-label={`Select ${title}`}
@@ -71,10 +71,10 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
         className={cn(
         "relative block w-full px-4 py-2.5 pl-10 text-left transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus",
-        selected ? "" : "hover:bg-muted/70",
+        selected ? "" : "hover:bg-surface/70",
         )}
       >
-      {selected ? <span className="absolute inset-y-0 left-0 w-0.5 bg-primary" aria-hidden /> : null}
+      {selected ? <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden /> : null}
       <div className="flex items-baseline justify-between gap-3">
         <span className="truncate text-[13px] font-semibold text-foreground">{title}</span>
         <time className="shrink-0 text-[11px] tabular-nums text-text-secondary" dateTime={item.updated_at}>

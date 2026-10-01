@@ -138,7 +138,12 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
           <div
             className={cn(
               "mt-1 whitespace-pre-wrap rounded-container px-3 py-2 text-[14px] leading-6",
-              fromCustomer ? "bg-muted text-foreground" : "border border-border bg-surface text-foreground",
+              "border text-foreground",
+              fromCustomer
+                ? "border-border bg-muted"
+                : entry.actor === "tajeran"
+                  ? "border-ai-100 bg-ai-50"
+                  : "border-border border-l-2 border-l-primary bg-surface",
             )}
           >
             {entry.body}
@@ -160,7 +165,7 @@ function EntryView({ entry, customerName, translations }: { entry: TimelineEntry
         <div className="flex w-6 shrink-0 justify-center pt-0.5 text-text-secondary">
           <StickyNote size={16} strokeWidth={1.75} aria-hidden />
         </div>
-        <div className="min-w-0 flex-1 border-l-2 border-border pl-3">
+        <div className="min-w-0 flex-1 rounded-container border border-warn-100 border-l-2 border-l-warning bg-warn-50 px-3 py-2">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-[12px] font-semibold text-text-secondary">Internal note</p>
             <time className="text-[11px] tabular-nums text-text-secondary" dateTime={entry.at}>{formatTime(entry.at)}</time>
