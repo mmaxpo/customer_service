@@ -53,11 +53,17 @@ class PrincipalResolver:
                     detail={"code": "workspace_membership_required"},
                 )
         else:
-            source = "personal_default"
-            selected = next(
-                (row for row in rows if row[0].kind == "personal"),
-                rows[0],
-            )
+            # The workspace the user last chose (for example the one they were
+            # invited to), if they still belong to it; otherwise their own.
+            remembered = getattr(user, "active_workspace_id", None)
+            selected = next((row for row in rows if row[0].id == remembered), None)
+            source = "remembered"
+            if selected is None:
+                source = "personal_default"
+                selected = next(
+                    (row for row in rows if row[0].kind == "personal"),
+                    rows[0],
+                )
 
         workspace, membership = selected
         return Principal(

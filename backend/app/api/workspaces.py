@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 from datetime import datetime
 from urllib.parse import urlencode
@@ -496,6 +497,31 @@ async def get_workspace_team_roster(
     return [TeamRosterEntry.model_validate(entry) for entry in roster]
 
 
+@router.get("/invitations/preview")
+async def preview_workspace_invitation(
+    token: str = Query(min_length=32, max_length=512),
+    db: AsyncSession = Depends(get_db),
+):
+    """What an invitation is for, so the accept page can say it before anyone
+    signs in. A used, expired or unknown link all answer the same way."""
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT i.email, i.role, w.name
+                FROM workspace_invitations i
+                JOIN workspaces w ON w.id = i.workspace_id
+                WHERE i.token_hash = :hash AND i.status = 'pending' AND i.expires_at > now()
+                """
+            ),
+            {"hash": hashlib.sha256(token.encode("utf-8")).hexdigest()},
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="This invitation is no longer valid.")
+    return {"email": row.email, "role": row.role, "workspace_name": row.name}
+
+
 @router.post(
     "/invitations/accept",
     response_model=WorkspaceMembershipRead,
@@ -506,13 +532,20 @@ async def accept_workspace_invitation(
     current_user=Depends(get_current_verified_user),
 ):
     try:
-        return await WorkspaceService(db).accept_invitation(
+        membership = await WorkspaceService(db).accept_invitation(
             token=payload.token,
             user_id=current_user.id,
             user_email=str(current_user.email),
         )
     except WorkspaceError as exc:
         _raise_http(exc)
+    # Joining a workspace opens it from now on (like Slack or Linear).
+    await db.execute(
+        text('UPDATE "user" SET active_workspace_id = :workspace_id WHERE id = :id'),
+        {"workspace_id": membership.workspace_id, "id": current_user.id},
+    )
+    await db.commit()
+    return membership
 
 
 __all__ = ["router"]

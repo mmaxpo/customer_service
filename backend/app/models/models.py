@@ -65,6 +65,12 @@ class User(Base):
     terms_version = Column(String(length=64), nullable=True)
     privacy_accepted_at = Column(DateTime(timezone=True), nullable=True)
     privacy_version = Column(String(length=64), nullable=True)
+    # The workspace the user last chose (set when they accept an invitation).
+    active_workspace_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),  # set by Postgres on INSERT
