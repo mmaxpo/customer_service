@@ -11,6 +11,9 @@ export type WaitingConversation = {
   last_customer_message: string;
   waiting_since: string;
   reason: string;
+  // Reply target from Settings → Workspace; null when no target is set.
+  reply_due_at: string | null;
+  target_state: "on_track" | "close" | "missed" | null;
 };
 
 export type WaitingApproval = { id: string; run_id: string; question: string | null; created_at: string };

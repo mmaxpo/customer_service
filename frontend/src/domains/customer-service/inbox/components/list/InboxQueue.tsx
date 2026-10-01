@@ -10,6 +10,8 @@ import { apiErrorMessage } from "@/platform/api/client";
 import { cn } from "@/platform/utils";
 
 import { topicLabel } from "@/domains/customer-service/model/topics";
+import { ReplyTargetChip } from "@/domains/customer-service/live/ReplyTargetChip";
+import { useWaitingForPerson } from "@/domains/customer-service/live/useWaitingForPerson";
 
 import { formatShortAgo, humanize, lower } from "../../case/format";
 
@@ -49,6 +51,7 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
   const title = item.customer_name || item.customer_email || "Unknown customer";
   const headline = item.subject || item.latest_message || "No messages yet";
   const preview = item.subject ? item.latest_message : null;
+  const waiting = useWaitingForPerson()?.find((row) => row.conversation_id === item.conversation_id);
 
   return (
     <div className={cn("relative border-b border-border", selected && "bg-primary/[0.06]")}>
@@ -87,6 +90,7 @@ function QueueRow({ item, selected, checked, onSelect, onToggle }: { item: Inbox
             {humanize(priority)}
           </span>
         ) : null}
+        {waiting ? <ReplyTargetChip item={waiting} /> : null}
         {ticketStatus && ticketStatus !== "open" ? <span className="shrink-0">{humanize(ticketStatus)}</span> : null}
         {item.tags.length ? <span className="truncate">{item.tags.slice(0, 2).join(", ")}</span> : null}
       </div>

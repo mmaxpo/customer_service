@@ -29,8 +29,11 @@ type Form = {
   welcome_message: string;
   brand_color: string;
   position: string;
+  logo: string | null;
   self_service: Record<SelfServiceKey, boolean>;
 };
+
+const LOGO_MAX_BYTES = 200 * 1024;
 
 const labelClass = "block text-[12.5px] font-medium text-foreground";
 
@@ -56,6 +59,7 @@ export default function ChatWidgetScreen() {
           welcome_message: settings.welcome_message,
           brand_color: settings.brand_color,
           position: settings.position,
+          logo: typeof settings.meta?.logo === "string" ? settings.meta.logo : null,
           self_service: {
             track_order: Boolean(chosen.track_order),
             report_problem: Boolean(chosen.report_problem),
@@ -84,8 +88,8 @@ export default function ChatWidgetScreen() {
     setSaving(true);
     setError(null);
     try {
-      const { self_service, ...look } = form;
-      const nextMeta = { ...meta, self_service };
+      const { self_service, logo, ...look } = form;
+      const nextMeta = { ...meta, self_service, logo };
       await updateChatWidgetSettings({ ...look, meta: nextMeta });
       setMeta(nextMeta);
       setStatus("Saved.");
@@ -94,6 +98,20 @@ export default function ChatWidgetScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function chooseLogo(file: File | undefined) {
+    if (!file) return;
+    if (file.size > LOGO_MAX_BYTES) {
+      setError("The logo must be smaller than 200 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setError(null);
+      set({ logo: String(reader.result) });
+    };
+    reader.readAsDataURL(file);
   }
 
   async function copy() {
@@ -142,6 +160,24 @@ export default function ChatWidgetScreen() {
               <option value="bottom-left">Bottom left</option>
             </select>
           </label>
+          <div className={`${labelClass} sm:col-span-2`}>
+            Logo
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              {form.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logo} alt="Your logo" className="h-10 w-10 rounded border border-border bg-surface object-cover" />
+              ) : null}
+              <input
+                type="file"
+                aria-label="Upload a logo"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => { chooseLogo(e.target.files?.[0]); e.target.value = ""; }}
+                className="max-w-full text-[13px] font-normal text-text-secondary"
+              />
+              {form.logo ? <Button type="button" size="sm" variant="ghost" onClick={() => set({ logo: null })}>Remove</Button> : null}
+            </div>
+            <p className="mt-1 text-[13px] font-normal text-text-secondary">Shown at the top of the chat instead of "AI". PNG, JPG or WebP, square, up to 200 KB.</p>
+          </div>
           <label className={`${labelClass} sm:col-span-2`}>Greeting<Textarea className="mt-1 font-normal" value={form.welcome_message} onChange={(e) => set({ welcome_message: e.target.value })} required /></label>
         </div>
       </section>

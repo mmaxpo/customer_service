@@ -13,6 +13,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
+from app.tenancy.models import Workspace
+from app.tenancy.working_calendar import reply_due_at, resolved_workspace_calendar
 
 
 def _automation(rows: list[dict]) -> dict:
@@ -136,12 +138,12 @@ class DeskInsightsService:
         result = await self.db.execute(
             text(
                 """
-                SELECT extract(epoch FROM (
+                SELECT first.asked_at, (
                   SELECT min(r.created_at) FROM cs_conversation_messages r
                   WHERE r.conversation_id = first.conversation_id
                     AND lower(r.sender_type::text) IN ('ai', 'agent')
                     AND r.created_at > first.asked_at
-                ) - first.asked_at) AS seconds
+                ) AS replied_at
                 FROM (
                   SELECT t.conversation_id, min(m.created_at) AS asked_at
                   FROM cs_tickets t
@@ -154,8 +156,28 @@ class DeskInsightsService:
             ),
             {"workspace_id": workspace_id, "start": start, "end": end},
         )
-        seconds = [row.seconds for row in result]
-        replied = [float(value) for value in seconds if value is not None]
+        rows = result.all()
+        replied = [
+            (row.replied_at - row.asked_at).total_seconds() for row in rows if row.replied_at
+        ]
+
+        # Reply target (Settings → Workspace): share of first replies that came
+        # in time. A conversation still unanswered past its due time counts as late.
+        workspace = await self.db.get(Workspace, workspace_id)
+        calendar = resolved_workspace_calendar(
+            timezone_name=workspace.timezone if workspace else None,
+            business_hours=workspace.business_hours if workspace else None,
+        )
+        now = datetime.now(timezone.utc)
+        in_time = late = 0
+        for row in rows:
+            due_at = reply_due_at(row.asked_at, calendar)
+            if due_at is None:
+                break
+            if row.replied_at and row.replied_at <= due_at:
+                in_time += 1
+            elif row.replied_at or now >= due_at:
+                late += 1
 
         result = await self.db.execute(
             text(
@@ -171,11 +193,13 @@ class DeskInsightsService:
 
         return {
             "first_reply": {
-                "conversations": len(seconds),
+                "conversations": len(rows),
                 "replied": len(replied),
                 "median_seconds": _median(replied),
                 "buckets": _buckets(replied, FIRST_REPLY_BUCKETS)
-                + [{"label": "No reply yet", "value": len(seconds) - len(replied)}],
+                + [{"label": "No reply yet", "value": len(rows) - len(replied)}],
+                "target_minutes": calendar.get("reply_target_minutes"),
+                "within_target_rate": round(100 * in_time / (in_time + late)) if in_time + late else None,
             },
             "resolution": {
                 "resolved": len(resolved),

@@ -24,7 +24,14 @@ type Rating = { responses: number; average: number | null; distribution: Record<
 type Bucket = { label: string; value: number };
 
 type Speed = {
-  first_reply: { conversations: number; replied: number; median_seconds: number | null; buckets: Bucket[] };
+  first_reply: {
+    conversations: number;
+    replied: number;
+    median_seconds: number | null;
+    buckets: Bucket[];
+    target_minutes: number | null;
+    within_target_rate: number | null;
+  };
   resolution: { resolved: number; median_seconds: number | null; buckets: Bucket[] };
 };
 
@@ -234,9 +241,16 @@ export function SpeedReport({ data }: { data: Insights }) {
 
   return (
     <>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className={`mt-5 grid gap-3 sm:grid-cols-2 ${reply.target_minutes ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
         <Stat label="First reply, median" value={duration(reply.median_seconds)} hint={speedChange(reply.median_seconds, before.first_reply.median_seconds, days)} />
         <Stat label="Conversations replied to" value={`${reply.replied} of ${reply.conversations}`} hint="By the bot or a team member" />
+        {reply.target_minutes ? (
+          <Stat
+            label="Answered within target"
+            value={percent(reply.within_target_rate)}
+            hint={`First reply within ${reply.target_minutes} min, during business hours`}
+          />
+        ) : null}
         <Stat label="Time to resolve, median" value={duration(resolution.median_seconds)} hint={speedChange(resolution.median_seconds, before.resolution.median_seconds, days)} />
         <Stat label="Tickets resolved" value={String(resolution.resolved)} hint="In this period" />
       </div>

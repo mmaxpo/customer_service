@@ -54,7 +54,7 @@ def normalize_working_calendar(value: dict[str, Any] | None) -> dict[str, Any]:
                 "out_of_hours": dict(DEFAULT_WORKING_CALENDAR["out_of_hours"])}
     if not isinstance(value, dict):
         raise ValueError("business_hours must be an object")
-    allowed = {"mode", "weekly_hours", "holidays", "out_of_hours"}
+    allowed = {"mode", "weekly_hours", "holidays", "out_of_hours", "reply_target_minutes"}
     unknown = set(value) - allowed
     if unknown:
         raise ValueError(f"unknown business_hours fields: {', '.join(sorted(unknown))}")
@@ -124,13 +124,32 @@ def normalize_working_calendar(value: dict[str, Any] | None) -> dict[str, Any]:
         raise ValueError("out_of_hours auto-reply configuration is invalid")
     if enabled and not (text and text.strip()):
         raise ValueError("auto_reply_text is required when auto_reply_enabled")
-    return {
+    normalized = {
         "mode": mode,
         "weekly_hours": normalized_weekly,
         "holidays": normalized_holidays,
         "out_of_hours": {"widget_state": widget_state, "auto_reply_enabled": enabled,
                            "auto_reply_text": text.strip() if isinstance(text, str) else None},
     }
+    # Optional: "first reply within X minutes, during business hours".
+    target = value.get("reply_target_minutes")
+    if target is not None:
+        if isinstance(target, bool) or not isinstance(target, int) or not 1 <= target <= 10080:
+            raise ValueError("reply_target_minutes must be a whole number from 1 to 10080")
+        normalized["reply_target_minutes"] = target
+    return normalized
+
+
+def reply_due_at(asked_at: datetime, calendar: dict[str, Any]) -> datetime | None:
+    """When the first reply to a message is due, or None when no target is set."""
+    target = calendar.get("reply_target_minutes")
+    if not target or calendar.get("mode") == "closed_ai_only":
+        return None
+    try:
+        return add_working_minutes(asked_at, target, calendar)
+    except ValueError:
+        # A weekly schedule with no open hours has no due time.
+        return None
 
 
 def resolved_workspace_calendar(*, timezone_name: str | None, business_hours: dict | None) -> dict[str, Any]:

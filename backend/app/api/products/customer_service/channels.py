@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import logging
+import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -266,6 +267,7 @@ async def get_public_widget_settings(
         "operating_state": state,
         "is_within_business_hours": state == "open",
         "self_service": _self_service(settings),
+        "logo": _logo(settings),
     }
 
 
@@ -668,6 +670,14 @@ def _self_service(settings) -> dict[str, bool]:
         key: bool(chosen.get(key))
         for key in ("track_order", *SELF_SERVICE_REQUESTS)
     }
+
+
+def _logo(settings) -> str | None:
+    """The merchant's logo (an uploaded image stored as a data URL), if any."""
+    logo = (settings.meta or {}).get("logo")
+    if isinstance(logo, str) and re.match(r"data:image/(png|jpeg|webp);base64,", logo):
+        return logo
+    return None
 
 
 def _order_ref(order_number: str) -> str:

@@ -8,6 +8,7 @@ import { apiErrorMessage } from "@/platform/api/client";
 
 import { formatShortAgo, formatTime, humanize } from "../inbox/case/format";
 import { LiveHeader } from "./LiveHeader";
+import { ReplyTargetChip } from "./ReplyTargetChip";
 import { liveApi, type LiveNow } from "./api";
 
 const REFRESH_MS = 30_000;
@@ -113,6 +114,7 @@ export default function LiveNowScreen() {
                         <p className="flex flex-wrap items-center gap-x-2 text-[13.5px]">
                           <span className="font-medium text-foreground">{item.customer_name ?? "Customer"}</span>
                           <span className="text-[12px] text-text-secondary">{humanize(item.channel)}</span>
+                          <ReplyTargetChip item={item} />
                         </p>
                         <p className="mt-0.5 truncate text-[13px] text-foreground">&ldquo;{item.last_customer_message}&rdquo;</p>
                         <p className="mt-0.5 text-[12.5px] text-text-secondary">{item.reason}</p>

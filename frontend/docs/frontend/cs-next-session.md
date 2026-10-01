@@ -70,7 +70,7 @@ Built on 2026-10-01 (all verified live through the public chat API, 14/14 correc
 
 Owner decisions on 2026-10-01: a person keeps the final say on refunds (Approvals), cancellations and damaged items (straight to the team), returns and billing worries (bot explains, then hands over). A paid but unshipped order asked about in chat is flagged for the team to ship; if that gets noisy, limit it (e.g. orders older than two days).
 
-Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget rows are **not committed yet**, ask the owner):
+Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3`; the chat widget as `a8af91bb`; the logo and reply-target rows are **not committed yet**, ask the owner):
 
 | Behaviour | Where |
 |---|---|
@@ -82,6 +82,9 @@ Built in the second 2026-10-01 session (Desk and chat fix committed as `f68023f3
 | Settings → **Chat widget** tab: on/off, install code, title, assistant name, colour, position, greeting, and three self-service switches stored in the widget settings under `meta.self_service` (`track_order`, `report_problem`, `start_return`). `/app/chatbot` redirects here; Connections links here. The tab saves only its own fields, so the attached workflow and auto-answer settings are untouched | `src/app/(app)/app/settings/chat-widget/page.tsx`, `domains/customer-service/chatbot/ChatWidgetScreen.tsx`, `domains/workspace/SettingsTabs.tsx` |
 | Widget self-service buttons (shown above the message box when switched on). **Track my order**: order number + email → status and tracking link straight from Shopify, no AI; the answer is shown only in the chat window, not saved to the conversation. **Report a problem** / **Start a return**: order number + description → saved as a customer message plus a "passed to our team" reply; no automation runs, and it appears in Live → Now after the usual one-minute grace | `frontend/public/tajeran-chat-widget.js`; `POST /chat/public/{key}/sessions/{id}/track-order` and `/requests` in `backend/app/api/products/customer_service/channels.py`; public settings return `self_service` |
 | Order lookup protection: `track-order` answers only when the order number and the order's email both match; a wrong number, a wrong email and an order with no email all return the same "not found" | `track_order` in `channels.py` (verified with #1006, #1007, #1001 and an unknown number) |
+| Chat widget logo: upload in Settings → Chat widget (PNG / JPG / WebP, up to 200 KB), stored as a data URL in the widget settings under `meta.logo`, shown in the chat header instead of "AI" | `ChatWidgetScreen.tsx`, `_logo` in `channels.py`, `tajeran-chat-widget.js`. The file picker itself was not exercised (the agent browser can't choose files); the logo was saved through the API and seen in the tab and the widget. |
+| Reply-time target + weekly schedule: Settings → Workspace has "First reply target (minutes)" and, for "Weekly schedule", one opening period per day. Stored in `workspaces.business_hours` (`reply_target_minutes`, `weekly_hours`). The mode value sent is now `scheduled` (the old form sent `weekly`, which the API rejects) | `src/app/(app)/app/settings/page.tsx`; `normalize_working_calendar` and `reply_due_at` in `backend/app/tenancy/working_calendar.py` |
+| Target shown in the app: each waiting conversation gets `reply_due_at` and `target_state` (`on_track` / `close` = last quarter of the allowed time / `missed`), counted in business hours from the customer's last message. Live → Now and the Inbox list show "Reply due in X min" or "Reply target missed"; Desk → Speed shows "Answered within target" (first reply by bot or person; unanswered past due counts as late) | `_waiting_for_person` in `live_monitor.py`, `_speed` in `desk_insights.py`, `live/ReplyTargetChip.tsx`, `LiveNowScreen.tsx`, `InboxQueue.tsx`, `DeskReports.tsx` |
 
 Work up to v22 is committed on branch `feature/cs-automation-live-desk` (not pushed).
 
@@ -138,10 +141,12 @@ Original task: Settings → Chat widget tab + self-service buttons
 - In the widget: "Track my order" asks for the order number (and email if needed) and shows status + tracking link from Shopify data directly (no AI). "Report a problem" and "Start a return" collect the order number and a short description, then hand to the team (human-only rule).
 - Check the order lookup can't be used to read someone else's order (require order number + matching email).
 
-### Task 7: NEXT. Reply-time targets + business hours
+### Task 7: DONE (see section 2). Does not use the old SLA policy / violation tables.
+
+Original task: Reply-time targets + business hours
 Settings → Workspace: "First reply within X, during business hours" plus the weekly schedule (the tab already has a Business hours setting; an SLA backend exists, see `customerServiceApi.slaViolations` and `backend/.claude/features/basic-sla.md`). Show "close to missing the target" in Live → Now, "% answered within target" in Desk, and a small timer on inbox cases near the target.
 
-### Task 8: Sales influenced by support
+### Task 8: NEXT. Sales influenced by support
 Desk: "Orders placed within 3 days after a support chat: N · $X" from Shopify order data matched to the chat's customer. Check what order data is stored locally before calling Shopify.
 
 ### Task 9: Unanswered-topic suggestions (uses AI)
@@ -157,6 +162,9 @@ Settings → Workspace: "Reply in the customer's language" + supported languages
 ---
 
 ## 4. Known gaps worth remembering
+- The dev workspace now has a 60-minute reply target (24/7), set during testing on 2026-10-01; most old test conversations show "Reply target missed".
+- The weekly schedule editor keeps one opening period per day; a day saved elsewhere with several periods would be reduced to the first on save. Holidays have no UI.
+- Because the bot answers in seconds, "Answered within target" is close to 100%; the target matters mostly for conversations waiting for a person.
 - The old chatbot page's controls for the attached workflow, minimum confidence and hand-off message are no longer in the UI (the values are kept). `chatbot/components/ChatbotHero.tsx`, `StorefrontPreviewPanel.tsx` and `ChatbotUi.tsx` are now unused.
 - A self-service request shows in Live with the reason "No automation answered this message." A clearer reason would need its own marker.
 - `public/widget-test.html` has no viewport meta tag, so the widget looks tiny at 375px on that page only.

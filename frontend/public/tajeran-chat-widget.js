@@ -119,6 +119,13 @@
       flex: none;
     }
 
+    #${ROOT_ID} .tj-avatar img {
+      width: 100%;
+      height: 100%;
+      border-radius: inherit;
+      object-fit: cover;
+    }
+
     #${ROOT_ID} .tj-title {
       font-size: 14px;
       font-weight: 800;
@@ -400,7 +407,9 @@
       <div class="tj-widget ${position}">
         <div class="tj-panel ${state.open ? "tj-open" : ""}">
           <div class="tj-header" style="background:${escapeAttr(brandColor)}">
-            <div class="tj-avatar">AI</div>
+            <div class="tj-avatar">${
+              settings.logo ? `<img src="${escapeAttr(settings.logo)}" alt="" />` : "AI"
+            }</div>
             <div>
               <div class="tj-title">${escapeHtml(title)}</div>
               <div class="tj-subtitle">${escapeHtml(assistantName)}</div>

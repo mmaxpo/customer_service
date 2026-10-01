@@ -5,10 +5,14 @@ automation did. Read-only over conversations, runs and waits.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.tenancy.models import Workspace
+from app.tenancy.working_calendar import reply_due_at, resolved_workspace_calendar
 
 # Latest problem recorded on a run: a step error, or a step that asked for a
 # person (e.g. the AI provider was down and the customer got the standby reply).
@@ -207,8 +211,24 @@ class LiveMonitorService:
             ),
             {"workspace_id": workspace_id},
         )
+        workspace = await self.db.get(Workspace, workspace_id)
+        calendar = resolved_workspace_calendar(
+            timezone_name=workspace.timezone if workspace else None,
+            business_hours=workspace.business_hours if workspace else None,
+        )
+        now = datetime.now(timezone.utc)
         waiting = []
         for row in result:
+            # Reply target: "close" in the last quarter of the allowed time.
+            due_at = reply_due_at(row.last_customer_at, calendar)
+            target_state = None
+            if due_at is not None:
+                if now >= due_at:
+                    target_state = "missed"
+                elif now >= row.last_customer_at + (due_at - row.last_customer_at) * 0.75:
+                    target_state = "close"
+                else:
+                    target_state = "on_track"
             if row.run_status is None and row.last_agent_at is not None:
                 reason = "Your team is handling this conversation, and the customer wrote again."
             elif row.run_status is None:
@@ -225,6 +245,8 @@ class LiveMonitorService:
                     "last_customer_message": (row.last_customer_message or "")[:200],
                     "waiting_since": row.last_customer_at,
                     "reason": reason,
+                    "reply_due_at": due_at,
+                    "target_state": target_state,
                 }
             )
         return waiting
