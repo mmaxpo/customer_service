@@ -80,7 +80,7 @@ def _chat_order_refusal(
     ctx, vars_: dict[str, Any], output: dict[str, Any], order_ref: str
 ) -> str | None:
     """In a customer chat, share an order only with the email it was placed with:
-    the email the chat started with, or one the customer typed in this message.
+    the email the chat started with, or one the customer typed in this conversation.
     Returns what to tell the customer when the order can't be shared."""
     event_payload = ((getattr(ctx, "extras", None) or {}).get("event") or {}).get(
         "payload"
@@ -99,7 +99,9 @@ def _chat_order_refusal(
 
     chat_email = str(event_payload.get("customer_email") or "").strip().lower()
 
-    if chat_email == order_email or order_email in str(vars_.get("input") or "").lower():
+    typed = f"{vars_.get('input') or ''}\n{vars_.get('conversation') or ''}".lower()
+
+    if chat_email == order_email or order_email in typed:
         return None
 
     return (

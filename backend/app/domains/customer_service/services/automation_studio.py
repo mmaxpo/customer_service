@@ -72,6 +72,7 @@ NODE_LIBRARY: dict[str, tuple[str, str, str]] = {
     "shopify.get_order": ("tools", "Find order", "Looks up the order in Shopify."),
     "shopify.order_action": ("tools", "Change the order", "Refunds, cancels, reships or changes the address in Shopify."),
     "customer_service.extract_order_ref": ("tools", "Find order number", "Reads the order number from the message."),
+    "customer_service.load_conversation": ("tools", "Remember the conversation", "Reads the earlier messages so follow-up questions make sense."),
     "kb.search": ("tools", "Search knowledge", "Finds answers in your help articles and policies."),
     "reply.customer_chat": ("tools", "Reply in chat", "Sends a message to the customer."),
     "web.search": ("tools", "Search the web", "Looks something up on the web."),

@@ -43,6 +43,13 @@ class ExtractOrderRefNode:
             )
 
         order_ref = f"#{match.group(1)}" if match else ""
+        from_history = False
+
+        # A follow-up ("When will it ship?") is about the order the customer
+        # named earlier in this conversation.
+        if not order_ref and vars_.get("conversation_order_ref"):
+            order_ref = str(vars_["conversation_order_ref"])
+            from_history = True
 
         return {
             "output": order_ref,
@@ -56,5 +63,6 @@ class ExtractOrderRefNode:
             "meta": {
                 "order_ref": order_ref,
                 "found": bool(order_ref),
+                "from_history": from_history,
             },
         }

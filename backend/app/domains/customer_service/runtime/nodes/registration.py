@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from app.runtime.nodes.registry import register_node
 
+from .conversation_history import (
+    LoadConversationConfig,
+    LoadConversationNode,
+)
 from .customer_chat import (
     CustomerChatReplyConfig,
     CustomerChatReplyNode,
@@ -32,6 +36,17 @@ def register_customer_service_nodes() -> None:
         group="Data",
         domain="customer_service",
         discovery_id="customer_service.extract_order_ref",
+    )
+
+    register_node(
+        "customer_service.load_conversation",
+        LoadConversationNode,
+        LoadConversationConfig,
+        title="Load Conversation History",
+        category="data",
+        group="Data",
+        domain="customer_service",
+        discovery_id="customer_service.load_conversation",
     )
 
     register_node(
