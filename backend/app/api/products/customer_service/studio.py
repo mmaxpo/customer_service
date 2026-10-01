@@ -19,6 +19,7 @@ from app.domains.customer_service.services.conversation_translation import (
 from app.domains.customer_service.services.collaboration import CollaborationService
 from app.domains.customer_service.services.desk_insights import DeskInsightsService
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
+from app.domains.customer_service.services.new_workflow import NewWorkflowService
 from app.domains.customer_service.services.unanswered_topics import (
     UnansweredTopicsService,
 )
@@ -155,7 +156,7 @@ async def draft_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
-    return await AutomationStudioService(db).draft_workflow(request=payload.request)
+    return await NewWorkflowService(db).draft_workflow(request=payload.request)
 
 
 @studio_router.post("/workflows")
@@ -164,7 +165,7 @@ async def create_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
-    return await AutomationStudioService(db).create_workflow(
+    return await NewWorkflowService(db).create_workflow(
         workspace_id=current_user.id, **payload.model_dump()
     )
 
@@ -176,7 +177,7 @@ async def set_workflow_enabled(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
-    return await AutomationStudioService(db).set_workflow_enabled(
+    return await NewWorkflowService(db).set_workflow_enabled(
         workspace_id=current_user.id, subscription_id=workflow_id, enabled=payload.enabled
     )
 
@@ -192,7 +193,7 @@ async def set_workflow_keywords(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
-    return await AutomationStudioService(db).set_workflow_keywords(
+    return await NewWorkflowService(db).set_workflow_keywords(
         workspace_id=current_user.id, subscription_id=workflow_id, keywords=payload.keywords
     )
 
@@ -203,7 +204,7 @@ async def delete_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_customer_service_permission("cs.automation.manage")),
 ):
-    await AutomationStudioService(db).delete_workflow(
+    await NewWorkflowService(db).delete_workflow(
         workspace_id=current_user.id, subscription_id=workflow_id
     )
 

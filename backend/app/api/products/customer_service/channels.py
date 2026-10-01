@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import logging
-import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
