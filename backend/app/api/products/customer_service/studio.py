@@ -131,6 +131,54 @@ async def studio_workflow(
     )
 
 
+class WorkflowDraftRequest(BaseModel):
+    request: str = Field(min_length=3, max_length=2000)
+
+
+class WorkflowCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=500)
+    topic: str | None = None
+    keywords: list[str] = Field(min_length=1, max_length=12)
+    workflow: dict
+
+
+class WorkflowEnabled(BaseModel):
+    enabled: bool
+
+
+@studio_router.post("/workflows/draft")
+async def draft_workflow(
+    payload: WorkflowDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).draft_workflow(request=payload.request)
+
+
+@studio_router.post("/workflows")
+async def create_workflow(
+    payload: WorkflowCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).create_workflow(
+        workspace_id=current_user.id, **payload.model_dump()
+    )
+
+
+@studio_router.post("/workflows/{workflow_id}/enabled")
+async def set_workflow_enabled(
+    workflow_id: UUID,
+    payload: WorkflowEnabled,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_customer_service_permission("cs.automation.manage")),
+):
+    return await AutomationStudioService(db).set_workflow_enabled(
+        workspace_id=current_user.id, subscription_id=workflow_id, enabled=payload.enabled
+    )
+
+
 @studio_router.get("/node-library")
 async def node_library(
     db: AsyncSession = Depends(get_db),

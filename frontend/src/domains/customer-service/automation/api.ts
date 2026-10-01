@@ -27,6 +27,20 @@ export type StudioWorkflow = {
   answered_7d: number;
   edited_at: string;
   open_proposal_id: string | null;
+  // A message must contain one of these for the workflow to run (empty = no keyword rule).
+  keywords: string[];
+  can_toggle: boolean;
+};
+
+// A workflow TCOS drafted from a prompt; nothing is saved until the owner saves it.
+export type WorkflowDraft = {
+  name: string;
+  description: string;
+  topic: string | null;
+  keywords: string[];
+  workflow: Record<string, unknown>;
+  graph: Graph;
+  validation_errors: string[];
 };
 
 export type StudioOverview = {
@@ -186,6 +200,15 @@ export const studioApi = {
       method: "POST",
       body: jsonBody({ workflow_id: workflowId, request }),
     }),
+
+  draftWorkflow: (request: string) =>
+    apiJson<WorkflowDraft>(`${base}/workflows/draft`, { method: "POST", body: jsonBody({ request }) }),
+
+  createWorkflow: (draft: Pick<WorkflowDraft, "name" | "description" | "topic" | "keywords" | "workflow">) =>
+    apiJson<{ workflow_id: string }>(`${base}/workflows`, { method: "POST", body: jsonBody(draft) }),
+
+  setWorkflowEnabled: (id: string, enabled: boolean) =>
+    apiJson(`${base}/workflows/${id}/enabled`, { method: "POST", body: jsonBody({ enabled }) }),
 
   workflow: (id: string) => apiJson<WorkflowDetail>(`${base}/workflows/${id}`),
 

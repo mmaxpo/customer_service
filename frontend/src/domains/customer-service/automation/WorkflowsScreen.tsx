@@ -13,7 +13,15 @@ import { ToneChip } from "../inbox/case/parts";
 import { UnansweredTopics } from "./UnansweredTopics";
 import { AutomationHeader } from "./AutomationHeader";
 import { MiniGraph } from "./WorkflowGraph";
-import { studioApi, type StudioOverview, type StudioWorkflow } from "./api";
+import { studioApi, type StudioOverview, type StudioWorkflow, type WorkflowDraft } from "./api";
+
+const NEW_WORKFLOW = "new";
+const TOPICS = [
+  { value: "", label: "Any topic" },
+  { value: "general", label: "General questions" },
+  { value: "shipping", label: "Shipping" },
+  { value: "refund", label: "Refunds" },
+];
 
 function statusChip(workflow: StudioWorkflow) {
   if (!workflow.enabled) return <ToneChip tone="neutral">Off</ToneChip>;
@@ -24,7 +32,12 @@ function statusChip(workflow: StudioWorkflow) {
   );
 }
 
-function WorkflowCard({ workflow }: { workflow: StudioWorkflow }) {
+function WorkflowCard({ workflow, onChanged }: { workflow: StudioWorkflow; onChanged: () => void }) {
+  const [switching, setSwitching] = useState(false);
+  const toggle = () => {
+    setSwitching(true);
+    studioApi.setWorkflowEnabled(workflow.id, !workflow.enabled).then(onChanged).catch(() => {}).finally(() => setSwitching(false));
+  };
   const answeredRate = workflow.runs_7d ? Math.round((workflow.answered_7d / workflow.runs_7d) * 100) : null;
 
   return (
@@ -37,6 +50,11 @@ function WorkflowCard({ workflow }: { workflow: StudioWorkflow }) {
         {workflow.description || "No description yet."}
         {workflow.dispatch_mode === "fallback" ? " Runs when no other workflow matches." : null}
       </p>
+      {workflow.keywords.length ? (
+        <p className="mt-1.5 text-[12.5px] leading-5 text-text-secondary">
+          Runs when a message contains: <span className="text-foreground">{workflow.keywords.join(", ")}</span>
+        </p>
+      ) : null}
       <div className="mb-4 mt-3">
         <MiniGraph graph={workflow.graph} />
       </div>
@@ -61,15 +79,77 @@ function WorkflowCard({ workflow }: { workflow: StudioWorkflow }) {
         <div className="mt-2 flex gap-4 font-medium">
           <Link href={`/app/workflows/edit/${workflow.id}`} className="text-primary hover:underline">Edit steps</Link>
           <Link href={`/app/workflows/history/${workflow.id}`} className="text-primary hover:underline">Version history</Link>
+          {workflow.can_toggle ? (
+            <button type="button" onClick={toggle} disabled={switching} className="ml-auto text-primary hover:underline disabled:opacity-60">
+              {workflow.enabled ? "Turn off" : "Turn on"}
+            </button>
+          ) : null}
         </div>
       </div>
     </li>
   );
 }
 
-function AskBar({ workflows }: { workflows: StudioWorkflow[] }) {
+function NewWorkflowDraft({ draft, onSaved, onDiscard }: { draft: WorkflowDraft; onSaved: () => void; onDiscard: () => void }) {
+  const [name, setName] = useState(draft.name);
+  const [keywords, setKeywords] = useState(draft.keywords.join(", "));
+  const [topic, setTopic] = useState(draft.topic ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const keywordList = keywords.split(",").map((word) => word.trim()).filter(Boolean);
+  const field = "mt-1 h-9 w-full rounded-control border border-border bg-surface px-2 text-[13.5px] font-normal text-foreground";
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await studioApi.createWorkflow({ name, description: draft.description, topic: topic || null, keywords: keywordList, workflow: draft.workflow });
+      onSaved();
+    } catch (err) {
+      setError(apiErrorMessage(err, "Could not save this workflow."));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={save} className="rounded-container border border-ai-accent/40 bg-surface p-4">
+      <h2 className="text-[15px] font-semibold text-foreground">New workflow drafted by TCOS</h2>
+      <p className="mt-1 text-[13px] text-text-secondary">{draft.description}</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <label className="text-[12.5px] font-medium text-foreground">Name<input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className={field} /></label>
+        <label className="text-[12.5px] font-medium text-foreground">
+          Runs when a message contains
+          <input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="gift wrap, gift note" required className={field} />
+        </label>
+        <label className="text-[12.5px] font-medium text-foreground">
+          And the topic is
+          <select value={topic} onChange={(e) => setTopic(e.target.value)} className={field}>
+            {TOPICS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+      </div>
+      <p className="mt-1.5 text-[12.5px] text-text-secondary">Keywords are separated by commas. Short words match more messages. Cancellations and damaged items always go to your team.</p>
+      <div className="mt-3"><MiniGraph graph={draft.graph} /></div>
+      <ol className="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-[12.5px] text-text-secondary">
+        {draft.graph.nodes.map((node, index) => <li key={node.id}>{index + 1}. {node.label}</li>)}
+      </ol>
+      {draft.validation_errors.length ? (
+        <p role="alert" className="mt-3 text-[13px] text-danger">This draft can't be saved yet: {draft.validation_errors.join(" ")}</p>
+      ) : null}
+      {error ? <p role="alert" className="mt-3 text-[13px] text-danger">{error}</p> : null}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" disabled={saving || !keywordList.length || draft.validation_errors.length > 0}>{saving ? "Saving…" : "Save"}</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDiscard}>Discard</Button>
+        <span className="text-[12.5px] text-text-secondary">It is saved switched off. You can edit its steps, then turn it on.</span>
+      </div>
+    </form>
+  );
+}
+
+function AskBar({ workflows, onDraft }: { workflows: StudioWorkflow[]; onDraft: (draft: WorkflowDraft) => void }) {
   const router = useRouter();
-  const [workflowId, setWorkflowId] = useState(workflows[0]?.id ?? "");
+  const [workflowId, setWorkflowId] = useState(workflows[0]?.id ?? NEW_WORKFLOW);
   const [request, setRequest] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +160,12 @@ function AskBar({ workflows }: { workflows: StudioWorkflow[] }) {
     setBusy(true);
     setError(null);
     try {
+      if (workflowId === NEW_WORKFLOW) {
+        onDraft(await studioApi.draftWorkflow(request.trim()));
+        setRequest("");
+        setBusy(false);
+        return;
+      }
       const proposal = await studioApi.createProposal(workflowId, request.trim());
       router.push(`/app/workflows/proposals/${proposal.id}`);
     } catch (err) {
@@ -104,13 +190,16 @@ function AskBar({ workflows }: { workflows: StudioWorkflow[] }) {
           {workflows.map((w) => (
             <option key={w.id} value={w.id}>{w.name}</option>
           ))}
+          <option value={NEW_WORKFLOW}>+ New workflow</option>
         </select>
         <label className="sr-only" htmlFor="ask-request">Describe the change</label>
         <input
           id="ask-request"
           value={request}
           onChange={(e) => setRequest(e.target.value)}
-          placeholder="Describe a change, e.g. if a delivery is more than 2 days late, apologise and offer a person"
+          placeholder={workflowId === NEW_WORKFLOW
+            ? "Describe the new workflow, e.g. answer questions about gift wrapping from the help articles"
+            : "Describe a change, e.g. if a delivery is more than 2 days late, apologise and offer a person"}
           className="h-9 min-w-0 flex-1 rounded-control px-2 text-[13.5px] text-foreground placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         />
         <Button type="submit" size="md" disabled={busy || !workflowId || request.trim().length < 3} className="h-9">
@@ -127,9 +216,14 @@ export default function WorkflowsScreen() {
   const [data, setData] = useState<StudioOverview | null>(null);
   const [reviewCount, setReviewCount] = useState<number>();
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<WorkflowDraft | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = () =>
+    studioApi.overview().then(setData).catch((err) => setError(apiErrorMessage(err, "Could not load workflows.")));
 
   useEffect(() => {
-    studioApi.overview().then(setData).catch((err) => setError(apiErrorMessage(err, "Could not load workflows.")));
+    void load();
     studioApi.reviewQueue().then((runs) => setReviewCount(runs.length)).catch(() => {});
   }, []);
 
@@ -141,14 +235,6 @@ export default function WorkflowsScreen() {
         title="Workflows"
         description="Every customer message goes to the workflow that fits. Anything that doesn't fit goes to your team."
         reviewCount={reviewCount}
-        actions={
-          <Link
-            href="/app/workflows/templates"
-            className="text-[13px] font-medium text-text-secondary hover:text-foreground hover:underline"
-          >
-            Templates & builder
-          </Link>
-        }
       />
 
       {error ? <p role="alert" className="text-[13.5px] text-danger">{error}</p> : null}
@@ -177,13 +263,22 @@ export default function WorkflowsScreen() {
             </p>
           </div>
 
-          {data.workflows.length ? <AskBar workflows={data.workflows} /> : null}
+          <AskBar workflows={data.workflows} onDraft={(next) => { setDraft(next); setNotice(null); }} />
+          {draft ? (
+            <NewWorkflowDraft
+              key={draft.name}
+              draft={draft}
+              onDiscard={() => setDraft(null)}
+              onSaved={() => { setDraft(null); setNotice("Saved. The new workflow is switched off: check its steps, then turn it on."); void load(); }}
+            />
+          ) : null}
+          {notice ? <p role="status" className="text-[13px] text-commerce-accent">{notice}</p> : null}
 
           <UnansweredTopics title="Questions your workflows don't answer yet" />
 
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.workflows.map((workflow) => (
-              <WorkflowCard key={workflow.id} workflow={workflow} />
+              <WorkflowCard key={workflow.id} workflow={workflow} onChanged={() => void load()} />
             ))}
             <li className="flex flex-col rounded-container border border-border bg-surface p-4">
               <div className="flex items-start justify-between gap-3">

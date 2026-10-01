@@ -1,11 +1,6 @@
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import WorkflowComposer from "@/domains/workflow/composer/components/WorkflowComposer";
-
-export default function WorkflowComposerPage() {
-    return (
-        <Suspense fallback={<div className="p-6 text-sm text-slate-500">Loading workflow composer...</div>}>
-            <WorkflowComposer />
-        </Suspense>
-    );
+// New workflows are now drafted from the Ask TCOS bar on the Workflows page.
+export default function Page() {
+  redirect("/app/workflows");
 }

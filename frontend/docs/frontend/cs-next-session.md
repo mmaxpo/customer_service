@@ -166,9 +166,14 @@ Cluster customer messages from the last 7 days that no workflow answered (outcom
 Original task: Answers in the customer's language (uses AI)
 Settings → Workspace: "Reply in the customer's language" + supported languages. `cs_conversation_insights.language` already detects language. In the inbox, show "Customer wrote in German · translated" with a translation for the team.
 
-### Next: new workflow from a prompt (replaces "Templates & builder")
-Owner's direction (2026-10-01): remove the old-theme "Templates & builder" page; the Ask bar should also create a new workflow from a prompt: TCOS names it, shows the graph, steps are editable, Save keeps it switched off, and the owner turns it on when ready.
-Open decision before building: how a new workflow gets its messages. The owner chose "topic match", but at dispatch time only five coarse rule-based topics exist (`CustomerServiceMessageClassifier`: refund, shipping, cancellation, damaged product, general), cancellation and damaged product are human-only, and the fallback workflow already takes "general". The eight Inbox/Desk topics come from a different detector that runs after the reply. A specific subject such as gift wrapping is "general" in both. Proposed: topic plus optional keywords, both chosen by TCOS and editable (`filters.intent` and `filters.keywords` already work in `_matches_filters`). Waiting for the owner's answer.
+### New workflow from a prompt: DONE, **not committed yet** (ask the owner)
+Replaces "Templates & builder" (link removed; `/app/workflows/templates` and `/builder` redirect to `/app/workflows`).
+- Ask bar → "+ New workflow" → TCOS drafts it from a starter graph (`STARTER_WORKFLOW`), names it and proposes keywords and an optional topic. Nothing is saved until **Save**; the draft panel lets the owner edit name, keywords and topic.
+- Save creates a `CustomerServiceEventSubscription` with `workflow_json`, `filters.keywords` (required, so it can never catch every message), optional `filters.intent` (general / shipping / refund), `is_active = false`, `meta.source = "studio_prompt"`. The card shows "Runs when a message contains: …" and a Turn on / Turn off link (only for workflows made this way). Steps are edited with the existing "Edit steps" screen.
+- A matching non-fallback workflow suppresses the fallback "Website chat automation", so one message gets one answer.
+- Code: `draft_workflow`, `create_workflow`, `set_workflow_enabled` in `automation_studio.py`; `POST /studio/workflows/draft`, `POST /studio/workflows`, `POST /studio/workflows/{id}/enabled`; `WorkflowsScreen.tsx`, `automation/api.ts`.
+- Verified live: test workflow "Gift Wrap Help" (`5abb161f-e119-44d7-8667-5ccbdc2ff96f`, left switched **off**) answered "Do you offer gift wrapping?" while a shipping question still went to the fallback.
+- Not built: changing keywords after saving, deleting a workflow from the UI, and "Review draft" on the unanswered-topic suggestions (it could now prefill this flow).
 
 ### Later (ask the owner first)
 - Create a brand-new workflow from a prompt. Routing decision needed: how a new workflow gets matched (keywords in `filters.keywords`, a new classifier intent, or an LLM router). A subscription with no filter would catch every message, so it must never ship without one.
@@ -177,6 +182,8 @@ Open decision before building: how a new workflow gets its messages. The owner c
 ---
 
 ## 4. Known gaps worth remembering
+- Reply language: after a German message, an English follow-up is still answered in German, even with the tightened rule (`48bc56ad`). Rare; not fixed.
+- The job worker only loads code when it starts. Production deploys restart it, so this is a development-only chore; `watchfiles` is installed, so the worker could be started with auto-reload in development.
 - The language rule wording was tightened after v23 went live (follow the latest customer message, not earlier ones: an English follow-up after a German message was answered in German). It is in `conversation_history.py`, **not committed**, and needs one more worker restart to take effect.
 - Saving the Chat widget tab sends back the whole `meta` it loaded, so a tab left open for a long time can overwrite newer `unanswered_topics` (cached topics, dismissals). Worth moving those to their own table if this grows.
 - Live → "Problems in the last 24 hours" still lists normal hand-overs as a problem row (now with the correct wording).
