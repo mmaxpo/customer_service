@@ -450,6 +450,14 @@ class CustomerSupportOrchestrationService:
                 handled=False,
             )
 
+        # A question about how returns or refunds work (no order named) is
+        # answered from the help articles by the chat workflow, not treated
+        # as a request to act on an order.
+        if objective.order_ref is None and _is_policy_question(message.content):
+            return CustomerSupportOrchestrationResult(
+                handled=False,
+            )
+
         # Actionable support objectives belong to the cognitive support
         # domain. They must not fall through to keyword/user workflow
         # dispatch merely because they are simple.
@@ -822,6 +830,27 @@ class CustomerSupportOrchestrationService:
             "Our team will review it and reply here. "
             "Nothing on your order has been changed yet."
         )
+
+
+_POLICY_QUESTION_OPENERS = (
+    "how do i",
+    "how can i",
+    "how does",
+    "how long",
+    "when do i",
+    "when will i",
+    "what is your",
+    "what's your",
+    "what are your",
+    "can i ",
+    "do you ",
+    "policy",
+)
+
+
+def _is_policy_question(content: str) -> bool:
+    lowered = content.lower()
+    return any(opener in lowered for opener in _POLICY_QUESTION_OPENERS)
 
 
 __all__ = [
