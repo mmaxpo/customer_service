@@ -5,6 +5,7 @@ teammate when they are mentioned in an internal note or given a conversation.
 
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
 from sqlalchemy import text
@@ -47,12 +48,18 @@ class CollaborationService:
         self, *, workspace_id: UUID, actor_id: UUID, conversation_id: UUID, body: str
     ) -> list[str]:
         """Notify every teammate written as @Name in an internal note."""
-        lowered = body.lower()
+        remaining = body.lower()
         mentioned = []
         team = await self.teammates(workspace_id=workspace_id)
         author = next((m["name"] for m in team if m["user_id"] == str(actor_id)), "A teammate")
-        for member in team:
-            if member["user_id"] == str(actor_id) or f"@{member['name'].lower()}" not in lowered:
+        # Longest names first, and each match is taken out of the text, so
+        # "@Anna" does not also count as "@Ann", nor "@Mehdi Tajeran" as "@Mehdi".
+        for member in sorted(team, key=lambda m: -len(m["name"])):
+            pattern = re.compile(rf"@{re.escape(member['name'].lower())}(?!\w)")
+            if not pattern.search(remaining):
+                continue
+            remaining = pattern.sub(" ", remaining)
+            if member["user_id"] == str(actor_id):
                 continue
             await NotificationService(self.db).create(
                 workspace_id=workspace_id,

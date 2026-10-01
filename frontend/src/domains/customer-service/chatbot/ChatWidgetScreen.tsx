@@ -99,7 +99,10 @@ export default function ChatWidgetScreen() {
     setError(null);
     try {
       const { self_service, logo, reply_language, ...look } = form;
-      const nextMeta = { ...meta, self_service, logo, reply_language };
+      // Other features keep their own keys in meta (for example the topic
+      // suggestions), so merge into what is saved now, not what this tab loaded.
+      const latest = await getChatWidgetSettings().then((settings) => settings.meta ?? {}).catch(() => meta);
+      const nextMeta = { ...latest, self_service, logo, reply_language };
       await updateChatWidgetSettings({ ...look, meta: nextMeta });
       setMeta(nextMeta);
       setStatus("Saved.");

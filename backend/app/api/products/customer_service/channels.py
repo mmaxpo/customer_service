@@ -8,7 +8,6 @@ import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.session import SessionLocal, get_db
@@ -43,6 +42,12 @@ from app.domains.customer_service.schemas.omnichannel import (
 from app.domains.customer_service.security.rbac import (
     get_customer_service_principal as get_current_user,
     require_customer_service_permission,
+)
+from app.domains.customer_service.services.chat_self_service import (
+    ChatSelfService,
+    RequestKind,
+    enabled_self_service,
+    widget_logo,
 )
 from app.domains.customer_service.services.chat_service import CustomerChatService
 from app.domains.customer_service.services.support.commerce.customer_support_commerce_context import (
@@ -267,8 +272,8 @@ async def get_public_widget_settings(
         "human_handoff_message": settings.human_handoff_message,
         "operating_state": state,
         "is_within_business_hours": state == "open",
-        "self_service": _self_service(settings),
-        "logo": _logo(settings),
+        "self_service": enabled_self_service(settings),
+        "logo": widget_logo(settings),
     }
 
 
@@ -445,22 +450,10 @@ async def create_public_message(
 
     # Once a team member has replied, the conversation is theirs: no automated
     # reply until the case is resolved.
-    team_is_handling = inbox_message is not None and bool(
-        await db.scalar(
-            text(
-                """
-                SELECT EXISTS (
-                  SELECT 1 FROM cs_conversation_messages m
-                  WHERE m.conversation_id = :conversation_id
-                    AND m.sender_type = 'agent'
-                    AND m.created_at > coalesce(
-                      (SELECT max(t.resolved_at) FROM cs_tickets t
-                        WHERE t.conversation_id = :conversation_id),
-                      '-infinity'::timestamptz)
-                )
-                """
-            ),
-            {"conversation_id": inbox_message.conversation_id},
+    team_is_handling = (
+        inbox_message is not None
+        and await service.team_member_is_handling(
+            conversation_id=inbox_message.conversation_id
         )
     )
 
@@ -663,42 +656,25 @@ async def rate_chat(
     )
 
 
-SELF_SERVICE_REQUESTS = {
-    "report_problem": "Report a problem",
-    "start_return": "Start a return",
-}
-
-
-def _self_service(settings) -> dict[str, bool]:
-    """Self-service buttons the merchant switched on (Settings → Chat widget)."""
-    chosen = (settings.meta or {}).get("self_service") or {}
-    return {
-        key: bool(chosen.get(key))
-        for key in ("track_order", *SELF_SERVICE_REQUESTS)
-    }
-
-
-def _logo(settings) -> str | None:
-    """The merchant's logo (an uploaded image stored as a data URL), if any."""
-    logo = (settings.meta or {}).get("logo")
-    if isinstance(logo, str) and re.match(r"data:image/(png|jpeg|webp);base64,", logo):
-        return logo
-    return None
-
-
-def _order_ref(order_number: str) -> str:
-    return "#" + order_number.strip().lstrip("#").strip()
-
-
 class TrackOrderRequest(BaseModel):
     order_number: str = Field(min_length=1, max_length=40)
     email: str = Field(min_length=3, max_length=320)
 
 
 class SelfServiceRequest(BaseModel):
-    kind: str
+    kind: RequestKind
     order_number: str = Field(min_length=1, max_length=40)
     description: str = Field(min_length=1, max_length=2000)
+
+
+async def _self_service_session(db: AsyncSession, public_key: str, session_id: UUID, button: str):
+    """The chat session, once the widget exists and has this button switched on."""
+    session = await _public_session(db, public_key, session_id)
+    service = build_service(db)
+    widget = await service.get_widget_settings_by_public_key(public_key=public_key)
+    if not enabled_self_service(widget).get(button):
+        raise HTTPException(status_code=404, detail="This self-service option is not enabled")
+    return session, ChatSelfService(db, service)
 
 
 @chat_router.post("/public/{public_key}/sessions/{session_id}/track-order")
@@ -708,38 +684,10 @@ async def track_order(
     payload: TrackOrderRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Order status straight from Shopify, no AI. Shared only when the order
-    number and the email it was placed with both match; a wrong number and a
-    wrong email get the same answer."""
-    session = await _public_session(db, public_key, session_id)
-    settings = await build_service(db).get_widget_settings_by_public_key(
-        public_key=public_key
+    session, self_service = await _self_service_session(db, public_key, session_id, "track_order")
+    return await self_service.track_order(
+        session=session, order_number=payload.order_number, email=payload.email
     )
-    if not _self_service(settings)["track_order"]:
-        raise HTTPException(status_code=404, detail="Order tracking is not enabled")
-
-    order = await build_application_runtime_services(
-        db=db, user_id=session.user_id
-    ).capabilities.invoke(
-        "shopify.get_order",
-        user_id=session.user_id,
-        payload={"order_ref": _order_ref(payload.order_number)},
-    )
-
-    order_email = str(order.get("customer_email") or "").strip().lower()
-    if not order.get("order_id") or not order_email or order_email != payload.email.strip().lower():
-        return {"found": False}
-
-    summary = order.get("summary") or {}
-    return {
-        "found": True,
-        "order_name": order.get("order_name"),
-        "paid": bool(summary.get("is_paid")),
-        "shipped": bool(summary.get("is_fulfilled")),
-        "carrier": summary.get("carrier"),
-        "tracking_number": summary.get("tracking_number"),
-        "tracking_url": summary.get("tracking_url"),
-    }
 
 
 @chat_router.post("/public/{public_key}/sessions/{session_id}/requests")
@@ -750,37 +698,15 @@ async def self_service_request(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    """Problem reports and returns go straight to the team: no automation runs."""
-    session = await _public_session(db, public_key, session_id)
-    service = build_service(db)
-    settings = await service.get_widget_settings_by_public_key(public_key=public_key)
-    if not _self_service(settings).get(payload.kind):
-        raise HTTPException(status_code=404, detail="This request type is not enabled")
-
-    message = await service.add_customer_message(
-        session_id=session.id,
-        content=(
-            f"{SELF_SERVICE_REQUESTS[payload.kind]}: order {_order_ref(payload.order_number)}\n"
-            f"{payload.description.strip()}"
-        ),
+    session, self_service = await _self_service_session(db, public_key, session_id, payload.kind)
+    conversation_id = await self_service.submit_request(
+        session=session,
+        kind=payload.kind,
+        order_number=payload.order_number,
+        description=payload.description,
     )
-    inbox_message = await service.add_inbox_customer_message_for_chat_session(
-        session=session, chat_message=message
-    )
-    reply = await service.add_ai_message(
-        session_id=session.id,
-        content=(
-            "Thanks. I've passed your request to our team. They'll review it "
-            "and reply here. Nothing on your order has been changed yet."
-        ),
-    )
-    await service.add_inbox_ai_message_for_chat_session(session=session, chat_message=reply)
-    await service.commit()
-
-    if inbox_message is not None:
-        background_tasks.add_task(
-            _analyze_conversation, session.user_id, inbox_message.conversation_id
-        )
+    if conversation_id is not None:
+        background_tasks.add_task(_analyze_conversation, session.user_id, conversation_id)
     return {"ok": True}
 
 

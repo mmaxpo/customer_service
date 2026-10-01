@@ -78,7 +78,10 @@ class ConversationTranslationService:
 
         translations = parsed.get("translations") or []
         code = str(parsed.get("language_code") or "").lower()
-        same = code == target.split("-")[0].lower() or len(translations) != len(messages)
+        same = code == target.split("-")[0].lower()
+        if not same and len(translations) != len(messages):
+            # A partial answer can't be matched to the messages it belongs to.
+            raise HTTPException(status_code=502, detail="The translation came back incomplete. Try again.")
         return {
             "language": parsed.get("language"),
             "translated": not same,

@@ -31,7 +31,7 @@ from app.domains.customer_service.models.workflows import (
     CustomerServiceWorkflowTemplate,
 )
 from app.node_registration import register_application_nodes
-from app.runtime.engine.validator import validate_workflow
+from app.runtime.validation import validate_workflow
 from app.runtime.nodes.registry.core import list_registered_nodes
 from app.workflow_operations.versions.repository import WorkflowVersionRepository
 
@@ -689,7 +689,7 @@ class AutomationStudioService:
         return {"workflow_id": str(subscription.id)}
 
     async def set_workflow_enabled(self, *, workspace_id: UUID, subscription_id: UUID, enabled: bool) -> dict:
-        subscription, _ = await self._subscription(workspace_id, subscription_id)
+        subscription = await self._prompt_workflow(workspace_id, subscription_id)
         subscription.is_active = enabled
         await self.db.commit()
         return {"workflow_id": str(subscription.id), "enabled": enabled}

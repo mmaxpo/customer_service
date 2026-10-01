@@ -62,6 +62,7 @@ def test_application_node_composition_registers_three_layers():
 
     assert product == {
         "customer_service.extract_order_ref",
+        "customer_service.load_conversation",
         "customer_service.project_support_outcome",
         "customer_service.record_support_outcome",
         "reply.customer_chat",

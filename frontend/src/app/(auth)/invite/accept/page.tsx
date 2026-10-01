@@ -51,6 +51,9 @@ export default function AcceptInvitePage() {
         return;
       }
       if (user.email.trim().toLowerCase() !== invite.email.trim().toLowerCase()) {
+        // Don't keep the token: it would send this other person back here on
+        // every visit. The invite link itself still works.
+        try { localStorage.removeItem(INVITE_KEY); } catch {}
         setSignedInAs(user.email);
         setStep("wrong-account");
         return;

@@ -136,7 +136,7 @@ export function InboxQueue({ items, folder, onFolderChange, selectedConversation
     return items.filter((item) => {
       const ticketStatus = lower(item.ticket?.status || item.status);
       const priority = lower(item.ticket?.priority);
-      if (view === "mine" && item.ticket?.assigned_to !== myId) return false;
+      if (view === "mine" && (!myId || item.ticket?.assigned_to !== myId)) return false;
       if (view === "unassigned" && item.ticket?.assigned_to) return false;
       if (view === "open" && ticketStatus !== "open") return false;
       if (view === "pending" && ticketStatus !== "pending") return false;

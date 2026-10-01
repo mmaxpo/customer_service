@@ -24,6 +24,7 @@ from app.domains.customer_service.services.live_monitor import LiveMonitorServic
 DAYS = 7
 MIN_QUESTIONS = 3
 REFRESH_AFTER = timedelta(hours=6)
+RETRY_AFTER = timedelta(minutes=10)
 MAX_MESSAGES = 200
 
 SYSTEM = (
@@ -53,21 +54,30 @@ class UnansweredTopicsService:
         stored = dict((settings.meta or {}).get("unanswered_topics") or {})
         now = datetime.now(timezone.utc)
 
-        generated_at = stored.get("generated_at")
-        if not generated_at or now - datetime.fromisoformat(generated_at) > REFRESH_AFTER:
+        if self._is_due(stored.get("generated_at"), REFRESH_AFTER, now) and self._is_due(
+            stored.get("failed_at"), RETRY_AFTER, now
+        ):
             fresh = await self._group(workspace_id)
-            # Keep the last result when the AI provider is down.
             if fresh is not None:
                 stored = {**stored, "generated_at": now.isoformat(), "topics": fresh}
-                settings.meta = {**(settings.meta or {}), "unanswered_topics": stored}
-                flag_modified(settings, "meta")
-                await self.db.commit()
+                stored.pop("failed_at", None)
+            else:
+                # The AI provider is down: keep the last result and wait before
+                # trying again, so page loads don't each make an AI call.
+                stored = {**stored, "failed_at": now.isoformat()}
+            settings.meta = {**(settings.meta or {}), "unanswered_topics": stored}
+            flag_modified(settings, "meta")
+            await self.db.commit()
 
         dismissed = set(stored.get("dismissed") or [])
         return {
             "days": DAYS,
             "topics": [t for t in stored.get("topics") or [] if t["topic"] not in dismissed],
         }
+
+    @staticmethod
+    def _is_due(last: str | None, after: timedelta, now: datetime) -> bool:
+        return not last or now - datetime.fromisoformat(last) > after
 
     async def dismiss(self, *, workspace_id: UUID, topic: str) -> dict:
         settings = await self._settings(workspace_id)

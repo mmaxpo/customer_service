@@ -421,6 +421,28 @@ class CustomerChatService:
             {"lock_key": lock_key},
         )
 
+    async def team_member_is_handling(self, *, conversation_id: UUID) -> bool:
+        """True once a team member has replied and the ticket has not been
+        resolved since: the conversation is theirs, so the bot stays quiet."""
+        return bool(
+            await self.repository.db.scalar(
+                text(
+                    """
+                    SELECT EXISTS (
+                      SELECT 1 FROM cs_conversation_messages m
+                      WHERE m.conversation_id = :conversation_id
+                        AND m.sender_type = 'agent'
+                        AND m.created_at > coalesce(
+                          (SELECT max(t.resolved_at) FROM cs_tickets t
+                            WHERE t.conversation_id = :conversation_id),
+                          '-infinity'::timestamptz)
+                    )
+                    """
+                ),
+                {"conversation_id": conversation_id},
+            )
+        )
+
     async def commit(self) -> None:
         """
         Commit the current customer-chat application transaction.

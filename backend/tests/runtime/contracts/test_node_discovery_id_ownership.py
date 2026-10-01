@@ -26,6 +26,9 @@ def test_non_core_node_owners_define_discovery_ids():
         "customer_service.extract_order_ref":
             "customer_service.extract_order_ref",
 
+        "customer_service.load_conversation":
+            "customer_service.load_conversation",
+
         "customer_service.project_support_outcome":
             "customer_service.project_support_outcome",
 
@@ -88,6 +91,7 @@ def test_tcos_catalog_uses_one_identity_per_runtime_node():
 
     # Product-owned IDs.
     assert "customer_service.extract_order_ref" in ids
+    assert "customer_service.load_conversation" in ids
     assert "customer_service.project_support_outcome" in ids
     assert "customer_service.record_support_outcome" in ids
     assert "reply.customer_chat" in ids
@@ -114,5 +118,5 @@ def test_tcos_catalog_uses_one_identity_per_runtime_node():
     assert "runtime.shopify_get_order" not in ids
     assert "runtime.shopify_order_action" not in ids
 
-    # 28 runtime nodes + 4 built-in agent tools.
-    assert len(ids) == 32
+    # 29 runtime nodes + 4 built-in agent tools.
+    assert len(ids) == 33

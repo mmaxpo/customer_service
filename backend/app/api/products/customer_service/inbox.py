@@ -125,7 +125,10 @@ async def update_ticket(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    ticket = await TicketRepository(db).update(
+    repository = TicketRepository(db)
+    before = await repository.get(current_user.id, ticket_id)
+    previous_assignee = before.assigned_to if before is not None else None
+    ticket = await repository.update(
         current_user.id,
         ticket_id,
         payload,
@@ -134,7 +137,7 @@ async def update_ticket(
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    if payload.assigned_to:
+    if payload.assigned_to and payload.assigned_to != previous_assignee:
         await CollaborationService(db).notify_assignment(
             workspace_id=current_user.id,
             actor_id=getattr(current_user, "actor_user_id", current_user.id),
