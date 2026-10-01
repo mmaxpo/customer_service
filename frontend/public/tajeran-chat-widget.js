@@ -51,6 +51,7 @@
     ratedSessionId: localStorage.getItem(ratedKey),
     // Self-service: the open form ({ kind, busy, error }) and answers shown
     // only in this chat window (order status is not saved to the conversation).
+    renderedCount: 0,
     selfService: null,
     notes: [],
   };
@@ -411,6 +412,16 @@
     const assistantName = settings.assistant_name || "Tajeran AI";
     const welcome = settings.welcome_message || "Hi! How can we help you today?";
 
+    // Redrawing resets the scroll position, so remember where the reader was.
+    // Stay at the newest message only when they were already there, or when
+    // something new arrived.
+    const list = root.querySelector(".tj-messages");
+    const previousTop = list ? list.scrollTop : null;
+    const wasAtBottom = !list || list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+    const count = state.messages.length + state.notes.length;
+    const hasNew = count !== state.renderedCount;
+    state.renderedCount = count;
+
     root.innerHTML = `
       <div class="tj-widget ${position}">
         <div class="tj-panel ${state.open ? "tj-open" : ""}">
@@ -511,7 +522,12 @@
       }
     });
 
-    scrollToBottom();
+    if (wasAtBottom || hasNew) {
+      scrollToBottom();
+    } else {
+      const redrawn = root.querySelector(".tj-messages");
+      if (redrawn) redrawn.scrollTop = previousTop;
+    }
   }
 
   function renderError(message) {
@@ -726,8 +742,11 @@
     if (!state.sessionId) return;
 
     const messages = await fetchJson(`${apiBase}/sessions/${state.sessionId}/messages`);
-    state.messages = Array.isArray(messages) ? messages : [];
-    renderShell();
+    const next = Array.isArray(messages) ? messages : [];
+    // The regular refresh usually finds nothing new: leave the chat as it is.
+    const unchanged = JSON.stringify(next) === JSON.stringify(state.messages);
+    state.messages = next;
+    if (!unchanged || !root.querySelector(".tj-messages")) renderShell();
   }
 
   async function sendMessage(content) {
