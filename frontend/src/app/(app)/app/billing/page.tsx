@@ -7,9 +7,9 @@ import { ProductNotice, ProductPanel, ProductStatCard } from "@/ui/product";
 import { customerServiceApi } from "@/domains/customer-service/api/customer-service";
 
 const plans = [
-  { id: "starter" as const, name: "Starter", description: "For a small support team getting started.", price: "$29/mo" },
-  { id: "growth" as const, name: "Growth", description: "For stores ready to automate more conversations.", price: "$79/mo" },
-  { id: "pro" as const, name: "Pro", description: "For teams running support as an operation.", price: "$199/mo" },
+  { id: "starter" as const, name: "Starter", description: "For a small support team getting started.", price: "$49/mo" },
+  { id: "growth" as const, name: "Growth", description: "For stores ready to automate more conversations.", price: "$149/mo" },
+  { id: "pro" as const, name: "Pro", description: "For teams running support as an operation.", price: "$399/mo" },
 ];
 
 export default function BillingPage() {

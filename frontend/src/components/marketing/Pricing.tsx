@@ -16,7 +16,7 @@ type Plan = { name: string; price: number | null; description: string; points: s
 const PLANS: Plan[] = [
   {
     name: "Starter",
-    price: 29,
+    price: 49,
     description: "For a small support team getting started.",
     points: ["Every channel in one inbox", "Agents answer order and shipping questions", "Approvals for refunds and cancellations"],
     cta: "Choose Starter",
@@ -24,7 +24,7 @@ const PLANS: Plan[] = [
   },
   {
     name: "Growth",
-    price: 79,
+    price: 149,
     description: "For stores ready to automate more conversations.",
     points: ["Everything in Starter", "Change workflows by describing them", "Replay changes on past conversations"],
     cta: "Choose Growth",
@@ -32,7 +32,7 @@ const PLANS: Plan[] = [
   },
   {
     name: "Pro",
-    price: 199,
+    price: 399,
     description: "For teams running support as an operation.",
     points: ["Everything in Growth", "Routing and teams", "Live view and Desk reports"],
     cta: "Choose Pro",
