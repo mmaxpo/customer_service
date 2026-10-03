@@ -15,13 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.providers.llm.factory import build_generate_llm_client
 from app.core.providers.llm.resilience import LLMProviderError
 from app.domains.customer_service.models import CustomerServiceEventSubscription
-from app.domains.customer_service.services.automation_studio import (
-    AutomationStudioService,
-    _catalog,
-    _graph_view,
-    _parse_json,
-    _validate,
-)
+from app.domains.customer_service.services.automation_studio import AutomationStudioService
+from app.domains.customer_service.services.automation_studio_helpers import catalog as get_catalog, graph_view, validate
+from app.domains.customer_service.services.automation_studio_json import parse_json
 
 # Topics a new workflow may be limited to. Cancellations and damaged items
 # always go to a person, so they are not offered.
@@ -96,7 +92,7 @@ class NewWorkflowService:
 
     async def draft_workflow(self, *, request: str) -> dict:
         """Draft a new chat workflow from a typed request. Nothing is saved."""
-        catalog = _catalog()
+        catalog = get_catalog()
         drafted = await self.studio._generate(base=STARTER_WORKFLOW, requests=[request], catalog=catalog)
         try:
             result = await build_generate_llm_client().generate(
@@ -104,7 +100,7 @@ class NewWorkflowService:
                 system=NEW_WORKFLOW_SYSTEM,
                 max_tokens=400,
             )
-            routing = _parse_json(result.text)
+            routing = parse_json(result.text)
         except LLMProviderError as exc:
             raise HTTPException(
                 status_code=503,
@@ -120,8 +116,8 @@ class NewWorkflowService:
             "topic": topic if topic in NEW_WORKFLOW_TOPICS else None,
             "keywords": _keywords(routing.get("keywords")),
             "workflow": drafted["workflow"],
-            "graph": _graph_view(drafted["workflow"], catalog),
-            "validation_errors": _validate(drafted["workflow"], catalog),
+            "graph": graph_view(drafted["workflow"], catalog),
+            "validation_errors": validate(drafted["workflow"], catalog),
         }
 
     async def create_workflow(
@@ -141,7 +137,7 @@ class NewWorkflowService:
             raise HTTPException(status_code=422, detail="Add at least one keyword so the workflow knows which messages to answer.")
         if topic is not None and topic not in NEW_WORKFLOW_TOPICS:
             raise HTTPException(status_code=422, detail="Unknown topic.")
-        errors = _validate(workflow, _catalog())
+        errors = validate(workflow, get_catalog())
         if errors:
             raise HTTPException(status_code=422, detail={"validation_errors": errors})
 

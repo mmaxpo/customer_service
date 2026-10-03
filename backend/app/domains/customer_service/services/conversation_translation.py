@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.providers.llm.factory import build_generate_llm_client
 from app.core.providers.llm.resilience import LLMProviderError
-from app.domains.customer_service.services.automation_studio import _parse_json
+from app.domains.customer_service.services.automation_studio_json import parse_json
 from app.tenancy.models import Workspace
 
 MAX_MESSAGES = 20
@@ -67,7 +67,7 @@ class ConversationTranslationService:
                 system=SYSTEM,
                 max_tokens=3000,
             )
-            parsed = _parse_json(reply.text)
+            parsed = parse_json(reply.text)
         except LLMProviderError as exc:
             raise HTTPException(
                 status_code=503,

@@ -18,7 +18,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from app.core.providers.llm.factory import build_generate_llm_client
 from app.core.providers.llm.resilience import LLMProviderError
 from app.domains.customer_service.models import CustomerChatWidgetSettings
-from app.domains.customer_service.services.automation_studio import _parse_json
+from app.domains.customer_service.services.automation_studio_json import parse_json
 from app.domains.customer_service.services.live_monitor import LiveMonitorService
 
 DAYS = 7
@@ -112,7 +112,7 @@ class UnansweredTopicsService:
                 system=SYSTEM,
                 max_tokens=3000,
             )
-            parsed = _parse_json(reply.text)
+            parsed = parse_json(reply.text)
         except (LLMProviderError, ValueError):
             return None
 

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.customer_service.models.commercial import CustomerServiceCSATSurvey
 from app.domains.customer_service.models.quality import CustomerServiceQualityReview
-from app.domains.customer_service.services.automation_studio import RUN_FLAG_REVIEW_TYPE
+from app.domains.customer_service.services.automation_studio_review import RUN_FLAG_REVIEW_TYPE
 
 
 class CustomerFeedbackService:
