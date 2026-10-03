@@ -13,6 +13,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 RUN groupadd --system tajeran && useradd --system --gid tajeran tajeran
+# Attachment scanning: the clamdscan client only; the daemon is the "clamav" service.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clamdscan \
+    && rm -rf /var/lib/apt/lists/* \
+    && printf 'TCPSocket 3310\nTCPAddr clamav\n' > /etc/clamav/clamd.conf
 COPY --from=builder /app/.venv /app/.venv
 COPY app app
 COPY migrations migrations

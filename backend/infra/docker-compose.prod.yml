@@ -23,6 +23,18 @@ services:
       timeout: 5s
       retries: 10
 
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
   migrate:
     build:
       context: ..
@@ -103,4 +115,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  clamav_data:
   attachment_data:
