@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any, NamedTuple
 from uuid import UUID
 
 import logging
@@ -53,6 +54,7 @@ from app.domains.customer_service.services.omnichannel import (
     CustomerServiceOmnichannelService,
 )
 from app.domains.customer_service.services.public_message_dispatch import (
+    PublicMessageDispatchResult,
     PublicMessageDispatchService,
 )
 from app.platform.events.publisher import PlatformEventPublisher
@@ -327,7 +329,19 @@ async def _analyze_conversation(user_id: UUID, conversation_id: UUID) -> None:
         )
 
 
-async def _public_session_context(db, public_key: str, session_id: UUID):
+class _SavedMessage(NamedTuple):
+    """A customer chat message once it is saved: the chat row, its inbox copy
+    (None when the chat has no inbox conversation) and the published event."""
+
+    message: Any
+    inbox_message: Any | None
+    event: Any
+
+
+async def _public_session_context(
+    db: AsyncSession, public_key: str, session_id: UUID
+) -> tuple[CustomerChatService, Any, Any]:
+    """The chat service, widget settings and session behind a public chat URL."""
     service = build_service(db)
     settings = await service.get_widget_settings_by_public_key(
         public_key=public_key,
@@ -341,7 +355,10 @@ async def _public_session_context(db, public_key: str, session_id: UUID):
     return service, settings, session
 
 
-async def _public_ingress_replay(service, session_id, client_message_id):
+async def _public_ingress_replay(
+    service: CustomerChatService, session_id: UUID, client_message_id: str | None
+) -> dict | None:
+    """The saved answer when this client message was already processed."""
     if not client_message_id:
         return None
 
@@ -375,7 +392,10 @@ async def _public_ingress_replay(service, session_id, client_message_id):
     }
 
 
-def _public_message_response(message, inbox_message, published, dispatch):
+def _public_message_response(
+    saved: _SavedMessage, dispatch: PublicMessageDispatchResult
+) -> dict:
+    message, inbox_message, event = saved
     return {
         "id": str(message.id),
         "role": message.role,
@@ -387,13 +407,19 @@ def _public_message_response(message, inbox_message, published, dispatch):
         "inbox_message_id": (
             str(inbox_message.id) if inbox_message is not None else None
         ),
-        "event_id": str(published["event"].id),
+        "event_id": str(event.id),
         "workflow_dispatch": dispatch.workflow_dispatch,
         "support_intake": dispatch.support_intake,
     }
 
 
-async def _save_public_message_and_event(service, db, settings, session, payload):
+async def _save_public_message_and_event(
+    service: CustomerChatService,
+    db: AsyncSession,
+    settings: Any,
+    session: Any,
+    payload: ChatMessageCreateRequest,
+) -> _SavedMessage:
     message = await service.add_customer_message(
         session_id=session.id,
         content=payload.content,
@@ -440,25 +466,23 @@ async def _save_public_message_and_event(service, db, settings, session, payload
         dispatch=False,
         commit=False,
     )
-    return message, inbox_message, published
+    return _SavedMessage(message, inbox_message, published["event"])
 
 
 async def _complete_public_message(
-    service,
-    settings,
-    payload,
-    message,
-    inbox_message,
-    published,
-    dispatch,
-    background_tasks,
-):
-    response_payload = _public_message_response(
-        message, inbox_message, published, dispatch
-    )
-    if payload.client_message_id:
+    *,
+    service: CustomerChatService,
+    workspace_id: UUID,
+    client_message_id: str | None,
+    saved: _SavedMessage,
+    dispatch: PublicMessageDispatchResult,
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """Remember the answer for retries, commit, and schedule the topic analysis."""
+    response_payload = _public_message_response(saved, dispatch)
+    if client_message_id:
         await service.save_public_ingress_result(
-            message=message,
+            message=saved.message,
             result={
                 "conversation_id": response_payload["conversation_id"],
                 "inbox_message_id": response_payload["inbox_message_id"],
@@ -469,9 +493,9 @@ async def _complete_public_message(
         )
 
     await service.commit()
-    if inbox_message is not None:
+    if saved.inbox_message is not None:
         background_tasks.add_task(
-            _analyze_conversation, settings.user_id, inbox_message.conversation_id
+            _analyze_conversation, workspace_id, saved.inbox_message.conversation_id
         )
     return {**response_payload, "idempotent_replay": False}
 
@@ -494,36 +518,31 @@ async def create_public_message(
     if replay is not None:
         return replay
 
-    message, inbox_message, published = await _save_public_message_and_event(
+    saved = await _save_public_message_and_event(
         service, db, settings, session, payload
-    )
-
-    runtime_services = build_application_runtime_services(
-        db=db,
-        user_id=settings.user_id,
     )
 
     dispatch = await PublicMessageDispatchService(
         db=db,
         chat_service=service,
-        runtime_services=runtime_services,
+        runtime_services=build_application_runtime_services(
+            db=db, user_id=settings.user_id
+        ),
     ).decide(
         user_id=settings.user_id,
         session=session,
-        message=message,
-        inbox_message=inbox_message,
-        event=published["event"],
+        message=saved.message,
+        inbox_message=saved.inbox_message,
+        event=saved.event,
     )
 
     return await _complete_public_message(
-        service,
-        settings,
-        payload,
-        message,
-        inbox_message,
-        published,
-        dispatch,
-        background_tasks,
+        service=service,
+        workspace_id=settings.user_id,
+        client_message_id=payload.client_message_id,
+        saved=saved,
+        dispatch=dispatch,
+        background_tasks=background_tasks,
     )
 
 
@@ -563,13 +582,7 @@ async def list_public_messages(
 
 
 async def _public_session(db: AsyncSession, public_key: str, session_id: UUID):
-    service = build_service(db)
-    settings = await service.get_widget_settings_by_public_key(public_key=public_key)
-    if settings is None or not settings.enabled:
-        raise HTTPException(status_code=404, detail="Chat widget not found")
-    session = await service.get_session(session_id=session_id)
-    if session is None or session.user_id != settings.user_id:
-        raise HTTPException(status_code=404, detail="Chat session not found")
+    _, _, session = await _public_session_context(db, public_key, session_id)
     return session
 
 
@@ -628,9 +641,7 @@ class SelfServiceRequest(BaseModel):
 
 async def _self_service_session(db: AsyncSession, public_key: str, session_id: UUID, button: str):
     """The chat session, once the widget exists and has this button switched on."""
-    session = await _public_session(db, public_key, session_id)
-    service = build_service(db)
-    widget = await service.get_widget_settings_by_public_key(public_key=public_key)
+    service, widget, session = await _public_session_context(db, public_key, session_id)
     if not enabled_self_service(widget).get(button):
         raise HTTPException(status_code=404, detail="This self-service option is not enabled")
     return session, ChatSelfService(db, service)

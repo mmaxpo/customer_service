@@ -28,6 +28,10 @@ from app.domains.customer_service.workflows.message_classifier import (
 )
 
 
+# Topics a person must handle; no workflow answers them.
+SAFE_HANDOFF_INTENTS = {"cancellation", "damaged_product"}
+
+
 @dataclass(frozen=True)
 class PublicMessageDispatchResult:
     orchestration: CustomerSupportOrchestrationResult
@@ -50,14 +54,15 @@ class PublicMessageDispatchService:
             message=message,
             inbox_message=inbox_message,
         )
+        classification = CustomerServiceMessageClassifier().classify(message.content)
         orchestration = await self._protect_risky_intent(
             session=session,
-            message=message,
+            intent=classification.intent,
             orchestration=orchestration,
         )
 
         if orchestration.handled:
-            workflow_dispatch = self._skipped_dispatch(orchestration, message)
+            workflow_dispatch = self._skipped_dispatch(orchestration, classification)
         else:
             workflow_dispatch = await CustomerServiceEventSubscriptionService(
                 self.db
@@ -99,15 +104,14 @@ class PublicMessageDispatchService:
         )
 
     async def _protect_risky_intent(
-        self, *, session, message, orchestration
+        self, *, session, intent: str, orchestration: CustomerSupportOrchestrationResult
     ) -> CustomerSupportOrchestrationResult:
-        # Do not let a merchant's single attached order-status workflow answer
-        # cancellation or damaged-item reports. Those topics stay in review.
-        classification = CustomerServiceMessageClassifier().classify(message.content)
-        if orchestration.handled or classification.intent not in {
-            "cancellation",
-            "damaged_product",
-        }:
+        # Do not let a merchant's single attached order-status workflow answer a
+        # risky request such as cancellation or a damaged-item report. Those
+        # intents must remain in the human-review lane until their dedicated
+        # approval workflow is selected. Give the customer a truthful handoff
+        # instead of running an unrelated workflow.
+        if orchestration.handled or intent not in SAFE_HANDOFF_INTENTS:
             return orchestration
 
         handoff_message = await self.chat_service.add_ai_message(
@@ -128,8 +132,9 @@ class PublicMessageDispatchService:
         )
 
     @staticmethod
-    def _skipped_dispatch(orchestration, message) -> dict:
-        classification = CustomerServiceMessageClassifier().classify(message.content)
+    def _skipped_dispatch(
+        orchestration: CustomerSupportOrchestrationResult, classification
+    ) -> dict:
         return {
             "matched": 0,
             "filter_matched": 0,
