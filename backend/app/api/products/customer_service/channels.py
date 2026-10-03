@@ -18,9 +18,6 @@ from app.domains.customer_service.integrations.omnichannel.providers import (
 from app.domains.customer_service.integrations.omnichannel.registry import (
     get_omnichannel_provider_registry,
 )
-from app.domains.customer_service.providers.commerce_defaults import (
-    build_default_commerce_order_adapter_registry,
-)
 from app.domains.customer_service.repositories.chat_repository import ChatRepository
 from app.domains.customer_service.schemas.chat import (
     ChatMessageCreateRequest,
@@ -49,21 +46,14 @@ from app.domains.customer_service.services.chat_self_service import (
     widget_logo,
 )
 from app.domains.customer_service.services.chat_service import CustomerChatService
-from app.domains.customer_service.services.support.commerce.customer_support_commerce_context import (
-    CustomerSupportCommerceContextService,
-)
-from app.domains.customer_service.services.support.customer_support_orchestration import (
-    CustomerSupportOrchestrationResult,
-    CustomerSupportOrchestrationService,
-)
 from app.domains.customer_service.services.event_subscriptions import (
     CustomerServiceEventSubscriptionService,
 )
 from app.domains.customer_service.services.omnichannel import (
     CustomerServiceOmnichannelService,
 )
-from app.domains.customer_service.workflows.message_classifier import (
-    CustomerServiceMessageClassifier,
+from app.domains.customer_service.services.public_message_dispatch import (
+    PublicMessageDispatchService,
 )
 from app.platform.events.publisher import PlatformEventPublisher
 from app.runtime_services import build_application_runtime_services
@@ -337,71 +327,82 @@ async def _analyze_conversation(user_id: UUID, conversation_id: UUID) -> None:
         )
 
 
-@chat_router.post("/public/{public_key}/sessions/{session_id}/messages")
-async def create_public_message(
-    public_key: str,
-    session_id: UUID,
-    payload: ChatMessageCreateRequest,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
-):
+async def _public_session_context(db, public_key: str, session_id: UUID):
     service = build_service(db)
-
     settings = await service.get_widget_settings_by_public_key(
         public_key=public_key,
     )
-
     if settings is None or not settings.enabled:
         raise HTTPException(status_code=404, detail="Chat widget not found")
 
     session = await service.get_session(session_id=session_id)
     if session is None or session.user_id != settings.user_id:
         raise HTTPException(status_code=404, detail="Chat session not found")
+    return service, settings, session
 
-    if payload.client_message_id:
-        await service.acquire_public_ingress_lock(
-            session_id=session_id,
-            client_message_id=payload.client_message_id,
-        )
 
-        existing_message = await service.get_message_by_client_message_id(
-            session_id=session_id,
-            client_message_id=payload.client_message_id,
-        )
+async def _public_ingress_replay(service, session_id, client_message_id):
+    if not client_message_id:
+        return None
 
-        if existing_message is not None:
-            public_ingress = (existing_message.meta or {}).get("public_ingress") or {}
-
-            if public_ingress:
-                return {
-                    "id": str(existing_message.id),
-                    "role": existing_message.role,
-                    "content": existing_message.content,
-                    "created_at": existing_message.created_at,
-                    "conversation_id": public_ingress.get("conversation_id"),
-                    "inbox_message_id": public_ingress.get("inbox_message_id"),
-                    "event_id": public_ingress.get("event_id"),
-                    "workflow_dispatch": public_ingress.get("workflow_dispatch")
-                    or {
-                        "matched": 0,
-                        "enqueued": [],
-                        "skipped": [],
-                    },
-                    "support_intake": public_ingress.get("support_intake"),
-                    "idempotent_replay": True,
-                }
-
-    message = await service.add_customer_message(
+    await service.acquire_public_ingress_lock(
         session_id=session_id,
+        client_message_id=client_message_id,
+    )
+    existing_message = await service.get_message_by_client_message_id(
+        session_id=session_id,
+        client_message_id=client_message_id,
+    )
+    if existing_message is None:
+        return None
+
+    public_ingress = (existing_message.meta or {}).get("public_ingress") or {}
+    if not public_ingress:
+        return None
+
+    return {
+        "id": str(existing_message.id),
+        "role": existing_message.role,
+        "content": existing_message.content,
+        "created_at": existing_message.created_at,
+        "conversation_id": public_ingress.get("conversation_id"),
+        "inbox_message_id": public_ingress.get("inbox_message_id"),
+        "event_id": public_ingress.get("event_id"),
+        "workflow_dispatch": public_ingress.get("workflow_dispatch")
+        or {"matched": 0, "enqueued": [], "skipped": []},
+        "support_intake": public_ingress.get("support_intake"),
+        "idempotent_replay": True,
+    }
+
+
+def _public_message_response(message, inbox_message, published, dispatch):
+    return {
+        "id": str(message.id),
+        "role": message.role,
+        "content": message.content,
+        "created_at": message.created_at,
+        "conversation_id": (
+            str(inbox_message.conversation_id) if inbox_message is not None else None
+        ),
+        "inbox_message_id": (
+            str(inbox_message.id) if inbox_message is not None else None
+        ),
+        "event_id": str(published["event"].id),
+        "workflow_dispatch": dispatch.workflow_dispatch,
+        "support_intake": dispatch.support_intake,
+    }
+
+
+async def _save_public_message_and_event(service, db, settings, session, payload):
+    message = await service.add_customer_message(
+        session_id=session.id,
         content=payload.content,
         client_message_id=payload.client_message_id,
     )
-
     inbox_message = await service.add_inbox_customer_message_for_chat_session(
         session=session,
         chat_message=message,
     )
-
     published = await PlatformEventPublisher(db).publish(
         user_id=settings.user_id,
         event_type="customer.chat.message.created",
@@ -435,113 +436,26 @@ async def create_public_message(
                 "human_handoff_message": settings.human_handoff_message,
             },
         },
-        meta={
-            "chat_widget": True,
-        },
+        meta={"chat_widget": True},
         dispatch=False,
         commit=False,
     )
+    return message, inbox_message, published
 
-    runtime_services = build_application_runtime_services(
-        db=db,
-        user_id=settings.user_id,
+
+async def _complete_public_message(
+    service,
+    settings,
+    payload,
+    message,
+    inbox_message,
+    published,
+    dispatch,
+    background_tasks,
+):
+    response_payload = _public_message_response(
+        message, inbox_message, published, dispatch
     )
-
-    # Once a team member has replied, the conversation is theirs: no automated
-    # reply until the case is resolved.
-    team_is_handling = (
-        inbox_message is not None
-        and await service.team_member_is_handling(
-            conversation_id=inbox_message.conversation_id
-        )
-    )
-
-    if team_is_handling:
-        orchestration = CustomerSupportOrchestrationResult(
-            handled=True,
-            dispatch_skip_reason="team_member_is_handling",
-        )
-    else:
-        orchestration = await CustomerSupportOrchestrationService(
-            db=db,
-            chat_service=service,
-            commerce_context=CustomerSupportCommerceContextService(
-                capabilities=runtime_services.capabilities,
-                commerce_adapters=(
-                    build_default_commerce_order_adapter_registry()
-                ),
-            ),
-        ).handle(
-            user_id=settings.user_id,
-            session=session,
-            message=message,
-        )
-
-    support_intake = orchestration.support_intake
-
-    classification = CustomerServiceMessageClassifier().classify(message.content)
-
-    # Do not let a merchant's single attached order-status workflow answer a
-    # risky request such as cancellation or a damaged-item report. Those
-    # intents must remain in the human-review lane until their dedicated
-    # approval workflow is selected. Give the customer a truthful handoff
-    # instead of running an unrelated workflow.
-    safe_handoff_intents = {"cancellation", "damaged_product"}
-    if not orchestration.handled and classification.intent in safe_handoff_intents:
-        handoff_message = await service.add_ai_message(
-            session_id=session.id,
-            content=(
-                "Thanks. I've passed your request to our team. They'll review it "
-                "and reply here. Nothing on your order has been changed yet."
-            ),
-        )
-        await service.add_inbox_ai_message_for_chat_session(
-            session=session,
-            chat_message=handoff_message,
-        )
-        orchestration = type(orchestration)(
-            handled=True,
-            support_intake=orchestration.support_intake,
-            dispatch_skip_reason="risky_intent_requires_human_review",
-        )
-
-    if orchestration.handled:
-        workflow_dispatch = {
-            "matched": 0,
-            "filter_matched": 0,
-            "selected": 0,
-            "enqueued": [],
-            "skipped": [
-                {
-                    "reason": orchestration.dispatch_skip_reason,
-                }
-            ],
-            "classification": classification.model_dump(),
-        }
-    else:
-        workflow_dispatch = await CustomerServiceEventSubscriptionService(
-            db
-        ).enqueue_matching_workflows_for_event(
-            event=published["event"],
-            commit=False,
-        )
-
-    response_payload = {
-        "id": str(message.id),
-        "role": message.role,
-        "content": message.content,
-        "created_at": message.created_at,
-        "conversation_id": (
-            str(inbox_message.conversation_id) if inbox_message is not None else None
-        ),
-        "inbox_message_id": (
-            str(inbox_message.id) if inbox_message is not None else None
-        ),
-        "event_id": str(published["event"].id),
-        "workflow_dispatch": workflow_dispatch,
-        "support_intake": support_intake,
-    }
-
     if payload.client_message_id:
         await service.save_public_ingress_result(
             message=message,
@@ -549,22 +463,68 @@ async def create_public_message(
                 "conversation_id": response_payload["conversation_id"],
                 "inbox_message_id": response_payload["inbox_message_id"],
                 "event_id": response_payload["event_id"],
-                "workflow_dispatch": workflow_dispatch,
-                "support_intake": support_intake,
+                "workflow_dispatch": dispatch.workflow_dispatch,
+                "support_intake": dispatch.support_intake,
             },
         )
 
     await service.commit()
-
     if inbox_message is not None:
         background_tasks.add_task(
             _analyze_conversation, settings.user_id, inbox_message.conversation_id
         )
+    return {**response_payload, "idempotent_replay": False}
 
-    return {
-        **response_payload,
-        "idempotent_replay": False,
-    }
+
+@chat_router.post("/public/{public_key}/sessions/{session_id}/messages")
+async def create_public_message(
+    public_key: str,
+    session_id: UUID,
+    payload: ChatMessageCreateRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    service, settings, session = await _public_session_context(
+        db, public_key, session_id
+    )
+
+    replay = await _public_ingress_replay(
+        service, session_id, payload.client_message_id
+    )
+    if replay is not None:
+        return replay
+
+    message, inbox_message, published = await _save_public_message_and_event(
+        service, db, settings, session, payload
+    )
+
+    runtime_services = build_application_runtime_services(
+        db=db,
+        user_id=settings.user_id,
+    )
+
+    dispatch = await PublicMessageDispatchService(
+        db=db,
+        chat_service=service,
+        runtime_services=runtime_services,
+    ).decide(
+        user_id=settings.user_id,
+        session=session,
+        message=message,
+        inbox_message=inbox_message,
+        event=published["event"],
+    )
+
+    return await _complete_public_message(
+        service,
+        settings,
+        payload,
+        message,
+        inbox_message,
+        published,
+        dispatch,
+        background_tasks,
+    )
 
 
 @chat_router.get("/public/{public_key}/sessions/{session_id}/messages")
